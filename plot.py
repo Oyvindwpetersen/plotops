@@ -110,7 +110,7 @@ def plotxy(
         )
 
     if ylabel is None:
-        ylabel = [f'y{i+1}' for i in range(n_signal)]
+        ylabel = [f'$y_{i+1}$' for i in range(n_signal)]
     if len(ylabel) != n_signal:
         raise ValueError(
             f'ylabel length ({len(ylabel)}) must match number of rows ({n_signal})'
@@ -214,6 +214,7 @@ def plotxy(
             
         figure.size(fig)
         figure.log_toggle(fig, key='l')
+        figure.enable_popout(fig, key='p')
 
 
     return figs, axes_all
