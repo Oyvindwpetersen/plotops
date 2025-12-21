@@ -97,6 +97,9 @@ def savefig(
             bbox_inches='tight' if tight else None,
             backend=renderer
         )
+        
+        print('saving ' + filename + ' to ' + folder + ' in ' + fmt)
+
 
 
 #%%
