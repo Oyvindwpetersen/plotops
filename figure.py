@@ -373,18 +373,15 @@ def log_toggle(fig, key='l'):
         if event.key != key:
             return
 
-        ax = fig.gca()
+        ax = fig.gca()   # must be fig, not plt
 
         if ax.get_yscale() == 'linear':
-            # Validate data before switching to log
-            # for line in ax.lines:
-            #     y = line.get_ydata(orig=False)
-            #     if np.any(y <= 0):
-            #         print('Log scale not valid: non-positive data')
-            #         return
-
+            for line in ax.lines:
+                y = line.get_ydata()
+                if np.any(y <= 0):
+                    print('Log not valid')
+                    return
             ax.set_yscale('log')
-
         else:
             ax.set_yscale('linear')
 
@@ -393,3 +390,78 @@ def log_toggle(fig, key='l'):
         fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect('key_press_event', on_key)
+
+    
+    
+#%%
+    
+def enable_active_axes_tracking(fig):
+    state = {'ax': None}
+
+    def on_click(event):
+        if event.inaxes is not None:
+            state['ax'] = event.inaxes
+
+    fig.canvas.mpl_connect('button_press_event', on_click)
+    return state
+
+def popout_active_axes(fig, state):
+    ax = state.get('ax', None)
+    if ax is None:
+        return
+
+    import matplotlib.pyplot as plt
+
+    new_fig, new_ax = plt.subplots()
+
+    for line in ax.lines:
+        new_ax.plot(
+            line.get_xdata(),
+            line.get_ydata(),
+            label=line.get_label(),
+            linestyle=line.get_linestyle(),
+            linewidth=line.get_linewidth(),
+            color=line.get_color(),
+            marker=line.get_marker(),
+        )
+
+    new_ax.set_xlim(ax.get_xlim())
+    new_ax.set_ylim(ax.get_ylim())
+    new_ax.set_xscale(ax.get_xscale())
+    new_ax.set_yscale(ax.get_yscale())
+
+    new_ax.set_xlabel(ax.get_xlabel())
+    new_ax.set_ylabel(ax.get_ylabel())
+    new_ax.set_title(ax.get_title())
+
+    new_ax.grid(True)
+
+    if ax.get_legend() is not None:
+        new_ax.legend()
+
+    new_fig.tight_layout()
+
+    try:
+        size(new_fig)
+    except Exception:
+        pass
+
+    try:
+        _bring_to_front(new_fig)
+    except Exception:
+        pass
+
+    new_fig.canvas.draw_idle()
+    return new_fig, new_ax
+
+def enable_popout(fig, key='p'):
+    state = enable_active_axes_tracking(fig)
+
+    def on_key(event):
+        if event.key != key:
+            return
+        popout_active_axes(fig, state)
+
+    fig.canvas.mpl_connect('key_press_event', on_key)
+
+#%%
