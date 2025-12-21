@@ -8,7 +8,7 @@ Created on Wed Dec  1 11:39:19 2021
 #%%
 
 from . import misc
-from . import print
 from . import plot
+from . import print
 
-__all__ = ['misc','print','plot']
+__all__ = ['misc','plot','print']

@@ -10,22 +10,6 @@ from . import figure
 
 #%%
 
-def _to_1d(x):
-    x = np.asarray(x)
-    if x.ndim == 2 and 1 in x.shape:
-        return x.reshape(-1)
-    if x.ndim != 1:
-        raise ValueError('x must be 1D or (1,N)/(N,1)')
-    return x
-
-
-def _to_2d(y):
-    y = np.asarray(y)
-    if y.ndim == 1:
-        return y.reshape(1, -1)
-    if y.ndim != 2:
-        raise ValueError('y must be 1D or 2D')
-    return y
 
 
 def plotxy(
@@ -121,7 +105,7 @@ def plotxy(
     if linestyle is None:
         linestyle = ['-'] * n_source
     if linewidth is None:
-        linewidth = [1.8] * n_source
+        linewidth = [1.2] * n_source
 
     if len(color) != n_source:
         raise ValueError(f'color length ({len(color)}) must match number of sources')
@@ -219,6 +203,22 @@ def plotxy(
 
     return figs, axes_all
 
+def _to_1d(x):
+    x = np.asarray(x)
+    if x.ndim == 2 and 1 in x.shape:
+        return x.reshape(-1)
+    if x.ndim != 1:
+        raise ValueError('x must be 1D or (1,N)/(N,1)')
+    return x
+
+
+def _to_2d(y):
+    y = np.asarray(y)
+    if y.ndim == 1:
+        return y.reshape(1, -1)
+    if y.ndim != 2:
+        raise ValueError('y must be 1D or 2D')
+    return y
 
 #%%
 
