@@ -56,3 +56,16 @@ def color(n, type=1):
     return palette[:n]
 
 
+def matrix_3d_to_2d(y):
+    """
+    Flatten y[i,j,:] row-by-row into y_2d[k,:].
+
+    y shape: (n1, n2, n3)
+    output shape: (n1*n2, n3)
+    """
+    y = np.asarray(y)
+    if y.ndim != 3:
+        raise ValueError('y must be a 3D array (n1, n2, n3)')
+
+    n1, n2, _ = y.shape
+    return y.reshape(n1 * n2, -1)
