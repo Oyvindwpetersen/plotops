@@ -58,14 +58,43 @@ def color(n, type=1):
 
 def matrix_3d_to_2d(y):
     """
-    Flatten y[i,j,:] row-by-row into y_2d[k,:].
+    Flatten a 3D array row-by-row into 2D.
 
-    y shape: (n1, n2, n3)
-    output shape: (n1*n2, n3)
+    Parameters
+    ----------
+    y : ndarray, shape (n1, n2, n3)
+        Input array.
+
+    Returns
+    -------
+    y_2d : ndarray, shape (n1*n2, n3)
+        Flattened array where blocks (i,j,:) become rows.
     """
+
     y = np.asarray(y)
     if y.ndim != 3:
         raise ValueError('y must be a 3D array (n1, n2, n3)')
 
     n1, n2, _ = y.shape
     return y.reshape(n1 * n2, -1)
+
+def labels_2d(nrow, ncol):
+    """
+    Generate indexed labels y_ij in row-major order.
+
+    Parameters
+    ----------
+    nrow : int
+        Number of rows.
+    ncol : int
+        Number of columns.
+
+    Returns
+    -------
+    labels : list of str
+        ['y11', 'y12', ..., 'y{nrow}{ncol}'].
+    """
+
+    return [f'y{i}{j}' for i in range(1, nrow + 1)
+                      for j in range(1, ncol + 1)]
+

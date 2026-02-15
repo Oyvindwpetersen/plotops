@@ -5,6 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import tkinter as tk
 from PyQt5 import QtCore   # or PyQt6 / PySide2 depending on backend
+import os
 
 #%%
 
@@ -105,21 +106,392 @@ def subplot(nh, nw,
 
     return axes, fig, pos 
 
+
+#%%
+
+def layout(
+    nrow,
+    ncol,
+    *,
+    subsize=(3.0, 6.0),
+    figsize=None,
+    gap=(1.5, 2.0),
+    marg_h=(1.2, 1.0),
+    marg_w=(1.5, 0.8),
+    latex=None,
+    aspect=None
+):
+    '''
+    Compute figure size (cm), subsize size (cm), and a normalized tight-layout
+    dictionary compatible with your `subsize(...)` function (gap/margins in
+    normalized figure units).
+
+    This merges the two workflows:
+
+    Mode A (subsize-driven)
+    -----------------------
+    Provide `subsize` and leave `figsize=None`:
+      - Computes figure size from subsize size + gaps + margins.
+      - If `latex` is provided, it overrides the figure width and adapts subsize width.
+        Height can be controlled by `aspect` or by specifying latex height.
+
+    Mode B (figure-driven)
+    ----------------------
+    Provide `figsize` and leave `subsize=None`:
+      - Computes subsize size from figure size + gaps + margins.
+      - If `latex` is provided, it can override the figure width (and optionally height).
+
+    Parameters
+    ----------
+    nrow, ncol : int
+        Number of subplot rows and columns.
+    subsize : None | (float, float)
+        (h_ax, w_ax) size of ONE subplot in cm. If provided, `figsize` must be None.
+    figsize : None | (float, float)
+        (h_fig, w_fig) of the full figure in cm. If provided, `subsize` must be None.
+    gap : float | (float, float)
+        Inter-subplot gaps in cm: (gap_h, gap_w).
+    marg_h : float | (float, float)
+        Figure margins in cm: (bottom, top).
+    marg_w : float | (float, float)
+        Figure margins in cm: (left, right).
+    latex : None | str | dict
+        Optional LaTeX sizing preset.
+
+        If str: one of 'single', 'double', 'beamer' (common widths in cm).
+          - In subplot-driven mode: overrides figure width; subplot width adapts.
+          - In figure-driven mode: overrides figure width; height kept from fig.
+
+        If dict:
+          - Must include 'width' to override width, and may include 'height' to override height.
+          - In subplot-driven mode: sets target width, optionally target height.
+          - In figure-driven mode: overrides width and/or height.
+
+    aspect : None | float
+        Only used in subplot-driven mode when `latex` sets the width but not the height.
+        Enforces: height = width / aspect  (aspect = W/H).
+        Example: aspect=1.6.
+
+    Returns
+    -------
+    figsize_out : (float, float)
+        (h_fig, w_fig) of the figure.
+    dict_tight : dict
+        Normalized tight layout dictionary:
+          {'gap':[gap_h_norm, gap_w_norm], 'marg_h':[bottom_norm, top_norm], 'marg_w':[left_norm, right_norm]}
+    subsize_out : (float, float)
+        (h_ax, w_ax) resulting subplot size in cm.
+
+    Raises
+    ------
+    ValueError
+        If both `subsize` and `figsize` are provided, or both are None,
+        or if margins/gaps leave no space.
+    '''
+    if int(nrow) != nrow or int(ncol) != ncol or nrow <= 0 or ncol <= 0:
+        raise ValueError('nrow and ncol must be positive integers')
+    nrow = int(nrow)
+    ncol = int(ncol)
+
+    if subsize is None and figsize is None:
+        raise ValueError('Provide subsize or figsize')
+
+    # If both are given -> figsize takes precedence
+    if subsize is not None and figsize is not None:
+        subsize = None
+
+    gap_h, gap_w = _as_pair(gap)
+    mh0, mh1 = _as_pair(marg_h)
+    mw0, mw1 = _as_pair(marg_w)
+
+    # ------------------------------------------------------------
+    # Parse latex option into target width/height overrides
+    # ------------------------------------------------------------
+    target_w = None
+    target_h = None
+
+    if latex is not None:
+        if isinstance(latex, str):
+            target_w = _latex_figwidth_cm(latex)
+        elif isinstance(latex, dict):
+            if 'width' in latex:
+                target_w = float(latex['width'])
+            if 'height' in latex:
+                target_h = float(latex['height'])
+        else:
+            raise ValueError('latex must be None, a string preset, or a dict')
+
+        if target_w is not None and target_w <= 0:
+            raise ValueError('latex width must be positive')
+        if target_h is not None and target_h <= 0:
+            raise ValueError('latex height must be positive')
+
+    # ------------------------------------------------------------
+    # Mode A: subplot-driven
+    # ------------------------------------------------------------
+    if subsize is not None:
+        h_ax, w_ax = _as_pair(subsize)
+        if h_ax <= 0 or w_ax <= 0:
+            raise ValueError('subsize must be positive')
+
+        if target_w is not None:
+            usable_w = target_w - mw0 - mw1 - (ncol - 1) * gap_w
+            if usable_w <= 0:
+                raise ValueError('Margins/gaps too large for requested latex width')
+            w_ax = usable_w / ncol
+            w_fig = target_w
+        else:
+            w_fig = ncol * w_ax + (ncol - 1) * gap_w + mw0 + mw1
+
+        # Height strategy in subplot-driven mode:
+        if target_h is not None:
+            h_fig = target_h
+            usable_h = h_fig - mh0 - mh1 - (nrow - 1) * gap_h
+            if usable_h <= 0:
+                raise ValueError('Margins/gaps too large for requested latex height')
+            h_ax = usable_h / nrow
+        elif (target_w is not None) and (aspect is not None):
+            aspect = float(aspect)
+            if aspect <= 0:
+                raise ValueError('aspect must be positive')
+            h_fig = w_fig / aspect
+            usable_h = h_fig - mh0 - mh1 - (nrow - 1) * gap_h
+            if usable_h <= 0:
+                raise ValueError('Margins/gaps too large for aspect-implied height')
+            h_ax = usable_h / nrow
+        else:
+            h_fig = nrow * h_ax + (nrow - 1) * gap_h + mh0 + mh1
+
+    # ------------------------------------------------------------
+    # Mode B: figure-driven
+    # ------------------------------------------------------------
+    else:
+        h_fig, w_fig = _as_pair(figsize)  # NOTE: (h, w)
+        if h_fig <= 0 or w_fig <= 0:
+            raise ValueError('figsize must be positive')
+
+        if target_w is not None:
+            w_fig = target_w
+        if target_h is not None:
+            h_fig = target_h
+
+        usable_h = h_fig - mh0 - mh1 - (nrow - 1) * gap_h
+        usable_w = w_fig - mw0 - mw1 - (ncol - 1) * gap_w
+        if usable_h <= 0 or usable_w <= 0:
+            raise ValueError('Margins and gaps leave no space for axes')
+
+        h_ax = usable_h / nrow
+        w_ax = usable_w / ncol
+
+    if h_fig <= 0 or w_fig <= 0:
+        raise ValueError('Computed figure size is not positive')
+
+    dict_tight = _dict_tight_from_cm(
+        (h_fig, w_fig),
+        gap_cm=gap,
+        marg_h_cm=marg_h,
+        marg_w_cm=marg_w
+    )
+
+    figsize_out = (h_fig, w_fig)
+    subsize_out = (h_ax, w_ax)
+
+    return figsize_out, dict_tight, subsize_out
+
+
+def latex_preset_defaults(preset='single'):
+    '''
+    Convenience defaults (cm) for gaps and margins that usually work well with LaTeX sizing.
+
+    Parameters
+    ----------
+    preset : str
+        'single' | 'double' | 'beamer'
+
+    Returns
+    -------
+    defaults : dict
+        Dictionary with:
+        - 'fig_width_cm'
+        - 'gap_cm'    : (gap_h_cm, gap_w_cm)
+        - 'marg_h_cm' : (bottom_cm, top_cm)
+        - 'marg_w_cm' : (left_cm, right_cm)
+    '''
+    fig_width_cm = _latex_figwidth_cm(preset)
+
+    if str(preset).lower() in ('double', 'twocol', 'two-col', '2col', '2-col'):
+        gap_cm = (0.6, 0.6)
+        marg_h_cm = (1.2, 0.9)
+        marg_w_cm = (1.1, 0.7)
+    elif str(preset).lower() in ('beamer', 'slide'):
+        gap_cm = (0.7, 0.7)
+        marg_h_cm = (1.0, 0.8)
+        marg_w_cm = (1.0, 0.8)
+    else:  # single
+        gap_cm = (0.5, 0.5)
+        marg_h_cm = (1.1, 0.9)
+        marg_w_cm = (1.0, 0.7)
+
+    return {
+        'fig_width_cm': fig_width_cm,
+        'gap_cm': gap_cm,
+        'marg_h_cm': marg_h_cm,
+        'marg_w_cm': marg_w_cm,
+    }
+
+
+def _as_pair(x):
+    '''
+    Normalize a scalar or a 2-tuple to a 2-tuple.
+
+    Parameters
+    ----------
+    x : float | int | (float, float)
+        If scalar, returned as (x, x). If iterable, must have length 2.
+
+    Returns
+    -------
+    pair : (float, float)
+        Two-element tuple.
+    '''
+    if isinstance(x, (int, float)):
+        return (float(x), float(x))
+    x = tuple(x)
+    if len(x) != 2:
+        raise ValueError('Expected scalar or length-2 iterable')
+    return (float(x[0]), float(x[1]))
+
+
+def _latex_figwidth_cm(preset='single'):
+    '''
+    Return common LaTeX figure widths in cm (de facto standards).
+    '''
+    preset = str(preset).lower()
+    if preset in ('single', 'half', 'onecol', 'one-col', '1col', '1-col'):
+        return 8.6
+    if preset in ('double', 'twocol', 'two-col', '2col', '2-col'):
+        return 17.8
+    if preset in ('beamer', 'slide'):
+        return 12.8
+    raise ValueError("Unknown preset. Use 'single', 'double', 'half', or 'beamer'.")
+
+
+def _dict_tight_from_cm(
+    fig_cm,
+    gap_cm,
+    marg_h_cm,
+    marg_w_cm
+):
+    '''
+    Convert absolute gaps/margins in cm to normalized (0..1) values.
+
+    Parameters
+    ----------
+    fig_cm : (float, float)
+        (h_fig_cm, w_fig_cm) of the full figure.
+    gap_cm : float | (float, float)
+        (gap_h_cm, gap_w_cm)
+    marg_h_cm : float | (float, float)
+        (bottom_cm, top_cm).
+    marg_w_cm : float | (float, float)
+        (left_cm, right_cm).
+    '''
+    h_cm, w_cm = _as_pair(fig_cm)  # NOTE: (h, w)
+    gap_h, gap_w = _as_pair(gap_cm)
+    mh0, mh1 = _as_pair(marg_h_cm)
+    mw0, mw1 = _as_pair(marg_w_cm)
+
+    if h_cm <= 0 or w_cm <= 0:
+        raise ValueError('fig_cm must be positive')
+    if min(gap_h, gap_w, mh0, mh1, mw0, mw1) < 0:
+        raise ValueError('gap/margins must be non-negative')
+
+    return {
+        'gap':    [gap_h / h_cm, gap_w / w_cm],
+        'marg_h': [mh0 / h_cm,   mh1 / h_cm],
+        'marg_w': [mw0 / w_cm,   mw1 / w_cm],
+    }
+
 #%%
 
 def syncx(axes):
     """
-    Link x-axes of a list of matplotlib Axes objects.
-    Zooming/panning one axis updates all others.
+    Share x-axes across multiple matplotlib Axes.
+
+    Parameters
+    ----------
+    axes : list of matplotlib.axes.Axes
+        List of axes. The first axis is used as reference.
+        All subsequent axes will share its x-axis.
+
+    Notes
+    -----
+    Zooming or panning in one axis updates all linked axes.
     """
+    
     if not axes:
         return
 
     base = axes[0]
     for ax in axes[1:]:
         ax.sharex(base)
-        
+
 #%%
+
+def axistight(ax, p=0.05, axes=('y',)):
+    """
+    Expand axis limits with relative padding (MATLAB-like behavior).
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes or iterable of Axes
+        Axis (or list of axes) to modify.
+    p : float or sequence of float
+        Relative padding fraction of data range.
+    axes : iterable of str
+        Axis specification strings:
+        'x', 'y', '+x', '-y', 'x0', 'ylog', etc.
+
+        Prefix '+' or '-' expands only one side.
+        Suffix '0' forces lower bound to zero.
+        Suffix 'log' applies padding in log10 space.
+    """
+
+
+    # --- allow ax to be a list/tuple ---
+    if isinstance(ax, (list, tuple)):
+        for a in ax:
+            axistight(a, p=p, axes=axes)
+        return
+
+    # --- from here: ax is a single Axes ---
+    ax.autoscale(enable=True, tight=True)
+
+    if np.isscalar(p):
+        p = [p] * len(axes)
+
+    for frac, spec in zip(p, axes):
+        log = spec.endswith('log')
+        base = spec[:-3] if log else spec          # remove trailing 'log'
+        axis = base[-1]                           # now 'x' or 'y'
+    
+        side = 'both'
+        keep_zero = False
+    
+        if base.startswith('+'):
+            side = 'positive'
+        elif base.startswith('-'):
+            side = 'negative'
+        elif base.endswith('0'):
+            keep_zero = True
+    
+        if axis == 'x':
+            lim = ax.get_xlim()
+            ax.set_xlim(_expand_limits(lim, frac, side, log, keep_zero))
+        elif axis == 'y':
+            lim = ax.get_ylim()
+            ax.set_ylim(_expand_limits(lim, frac, side, log, keep_zero))
+
         
 def _expand_limits(lim, frac, side='both', log=False, keep_zero=False):
     """
@@ -159,65 +531,38 @@ def _expand_limits(lim, frac, side='both', log=False, keep_zero=False):
 
     return lo, hi
 
-
 #%%
 
-def axistight(ax, p=0.05, axes=('y',)):
+def tile(nw, nh, side=None, gap_px=10, extra_vgap_px=50,
+         edge_px=20, top_gap_px=60, bottom_gap_px=100):
     """
-    MATLAB-like axistight for matplotlib.
+    Tile all open matplotlib figure windows on the screen.
 
     Parameters
     ----------
-    ax : matplotlib Axes or iterable of Axes
-    p : float or sequence
-        Relative padding per axis
-    axes : iterable of str
-        'x', 'y', '+x', '-y', 'x0', 'ylog', etc.
+    nw : int
+        Number of columns of windows.
+    nh : int
+        Number of rows of windows.
+    side : {'l', 'r', None}, optional
+        Restrict tiling to left or right half of screen.
+    gap_px : int
+        Horizontal gap between windows (pixels).
+    extra_vgap_px : int
+        Additional vertical gap (pixels).
+    edge_px : int
+        Screen margin on left/right edges.
+    top_gap_px : int
+        Margin at top of screen.
+    bottom_gap_px : int
+        Margin at bottom of screen.
+
+    Raises
+    ------
+    ValueError
+        If screen size is insufficient.
     """
 
-    # --- allow ax to be a list/tuple ---
-    if isinstance(ax, (list, tuple)):
-        for a in ax:
-            axistight(a, p=p, axes=axes)
-        return
-
-    # --- from here: ax is a single Axes ---
-    ax.autoscale(enable=True, tight=True)
-
-    if np.isscalar(p):
-        p = [p] * len(axes)
-
-    for frac, spec in zip(p, axes):
-        log = spec.endswith('log')
-        axis = spec[-1]
-
-        side = 'both'
-        keep_zero = False
-
-        if spec.startswith('+'):
-            side = 'positive'
-        elif spec.startswith('-'):
-            side = 'negative'
-        elif spec.endswith('0'):
-            keep_zero = True
-
-        if axis == 'x':
-            lim = ax.get_xlim()
-            newlim = _expand_limits(lim, frac, side, log, keep_zero)
-            ax.set_xlim(newlim)
-
-        elif axis == 'y':
-            lim = ax.get_ylim()
-            newlim = _expand_limits(lim, frac, side, log, keep_zero)
-            ax.set_ylim(newlim)
-
-
-#%%
-
-def tile(nw, nh,side=None,gap_px=10,extra_vgap_px=50,edge_px=20,top_gap_px=60,bottom_gap_px=100):
-    """
-    Tile all open matplotlib figures on screen without overlap.
-    """
 
     figs = [plt.figure(n) for n in plt.get_fignums()]
     if not figs:
@@ -308,17 +653,23 @@ def _bring_to_front(fig):
   
 #%%
   
-def size(
-    fig,
-    width_frac=0.5,
-    height_frac=0.5,
-    y_center_frac=2/3
-):
+def size(fig, width_frac=0.5, height_frac=0.5, y_center_frac=2/3):
     """
-    Resize and place a matplotlib figure.
+    Resize and position a matplotlib figure window.
 
-    y_center_frac is measured from the *bottom* of the screen.
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Figure to resize.
+    width_frac : float
+        Fraction of screen width.
+    height_frac : float
+        Fraction of screen height.
+    y_center_frac : float
+        Vertical center position measured from bottom
+        (fraction of screen height).
     """
+
     
     root = tk.Tk()
     root.withdraw()
@@ -365,9 +716,24 @@ def enable_log_toggle_old(fig, key='l'):
 
     fig.canvas.mpl_connect('key_press_event', on_key)
 
+
 #%%
 
 def log_toggle(fig, key='l'):
+    """
+    Enable interactive toggling of y-axis between linear and log scale.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Target figure.
+    key : str
+        Keyboard key used to toggle scale.
+
+    Notes
+    -----
+    Log scaling is applied only if all y-data are positive.
+    """
 
     def on_key(event):
         if event.key != key:
@@ -391,7 +757,6 @@ def log_toggle(fig, key='l'):
 
     fig.canvas.mpl_connect('key_press_event', on_key)
 
-    
     
 #%%
     
