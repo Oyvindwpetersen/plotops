@@ -16,7 +16,8 @@ def subplot(nh, nw,
                   weight_h=None,
                   weight_w=None,
                   fig=None,
-                  skipaxes=False):
+                  skipaxes=False,
+                  **kwargs):
     """
     MATLAB-equivalent tight_subplot using absolute normalized gaps and margins.
 
@@ -110,6 +111,189 @@ def subplot(nh, nw,
 #%%
 
 def layout(
+    nrow,
+    ncol,
+    *,
+    subsize=(3.0, 6.0),
+    figsize=None,
+    gap=(1.5, 2.0),
+    marg_h=(1.2, 1.0),
+    marg_w=(1.5, 0.8),
+    latex=None,
+    aspect=None
+):
+    """
+    Compute figure and subplot sizing in cm, and a normalized tight-layout dict.
+
+    Modes
+    -----
+    Mode A (subsize-driven):
+        Provide `subsize` and leave `figsize=None`.
+    Mode B (figure-driven):
+        Provide `figsize` and leave `subsize=None`.
+
+    Parameters
+    ----------
+    nrow, ncol : int
+        Number of subplot rows and columns.
+    subsize : None | (float, float)
+        (h_ax, w_ax) size of ONE subplot in cm.
+    figsize : None | (float, float)
+        (h_fig, w_fig) of the full figure in cm.
+    gap : float | (float, float)
+        Inter-subplot gaps in cm: (gap_h, gap_w).
+    marg_h : float | (float, float)
+        Figure margins in cm: (bottom, top).
+    marg_w : float | (float, float)
+        Figure margins in cm: (left, right).
+    latex : None | str | dict
+        Optional LaTeX sizing preset (width/height overrides).
+    aspect : None | float
+        Only used in subplot-driven mode when `latex` sets width but not height.
+        Enforces: height = width / aspect (aspect = W/H).
+
+    Returns
+    -------
+    out : dict
+        Dictionary with both absolute (cm) and normalized (0..1) layout:
+
+        - 'figsize'    : (h_fig_cm, w_fig_cm)
+        - 'subsize_cm' : (h_ax_cm, w_ax_cm)
+        - 'gap_cm'     : (gap_h_cm, gap_w_cm)
+        - 'marg_h_cm'  : (bottom_cm, top_cm)
+        - 'marg_w_cm'  : (left_cm, right_cm)
+        - 'gap'        : [gap_h_norm, gap_w_norm]
+        - 'marg_h'     : [bottom_norm, top_norm]
+        - 'marg_w'     : [left_norm, right_norm]
+
+    Raises
+    ------
+    ValueError
+        If inputs are inconsistent or margins/gaps leave no space.
+    """
+
+    if int(nrow) != nrow or int(ncol) != ncol or nrow <= 0 or ncol <= 0:
+        raise ValueError('nrow and ncol must be positive integers')
+    nrow = int(nrow)
+    ncol = int(ncol)
+
+    if subsize is None and figsize is None:
+        raise ValueError('Provide subsize or figsize')
+
+    # If both are given -> figsize takes precedence (keeps your original behavior)
+    if subsize is not None and figsize is not None:
+        subsize = None
+
+    gap_h, gap_w = _as_pair(gap)
+    mh0, mh1 = _as_pair(marg_h)
+    mw0, mw1 = _as_pair(marg_w)
+
+    # ------------------------------------------------------------
+    # Parse latex option into target width/height overrides
+    # ------------------------------------------------------------
+    target_w = None
+    target_h = None
+
+    if latex is not None:
+        if isinstance(latex, str):
+            target_w = _latex_figwidth_cm(latex)
+        elif isinstance(latex, dict):
+            if 'width' in latex:
+                target_w = float(latex['width'])
+            if 'height' in latex:
+                target_h = float(latex['height'])
+        else:
+            raise ValueError('latex must be None, a string preset, or a dict')
+
+        if target_w is not None and target_w <= 0:
+            raise ValueError('latex width must be positive')
+        if target_h is not None and target_h <= 0:
+            raise ValueError('latex height must be positive')
+
+    # ------------------------------------------------------------
+    # Mode A: subplot-driven
+    # ------------------------------------------------------------
+    if subsize is not None:
+        h_ax, w_ax = _as_pair(subsize)
+        if h_ax <= 0 or w_ax <= 0:
+            raise ValueError('subsize must be positive')
+
+        if target_w is not None:
+            usable_w = target_w - mw0 - mw1 - (ncol - 1) * gap_w
+            if usable_w <= 0:
+                raise ValueError('Margins/gaps too large for requested latex width')
+            w_ax = usable_w / ncol
+            w_fig = target_w
+        else:
+            w_fig = ncol * w_ax + (ncol - 1) * gap_w + mw0 + mw1
+
+        if target_h is not None:
+            h_fig = target_h
+            usable_h = h_fig - mh0 - mh1 - (nrow - 1) * gap_h
+            if usable_h <= 0:
+                raise ValueError('Margins/gaps too large for requested latex height')
+            h_ax = usable_h / nrow
+        elif (target_w is not None) and (aspect is not None):
+            aspect = float(aspect)
+            if aspect <= 0:
+                raise ValueError('aspect must be positive')
+            h_fig = w_fig / aspect
+            usable_h = h_fig - mh0 - mh1 - (nrow - 1) * gap_h
+            if usable_h <= 0:
+                raise ValueError('Margins/gaps too large for aspect-implied height')
+            h_ax = usable_h / nrow
+        else:
+            h_fig = nrow * h_ax + (nrow - 1) * gap_h + mh0 + mh1
+
+    # ------------------------------------------------------------
+    # Mode B: figure-driven
+    # ------------------------------------------------------------
+    else:
+        h_fig, w_fig = _as_pair(figsize)  # NOTE: (h, w)
+        if h_fig <= 0 or w_fig <= 0:
+            raise ValueError('figsize must be positive')
+
+        if target_w is not None:
+            w_fig = target_w
+        if target_h is not None:
+            h_fig = target_h
+
+        usable_h = h_fig - mh0 - mh1 - (nrow - 1) * gap_h
+        usable_w = w_fig - mw0 - mw1 - (ncol - 1) * gap_w
+        if usable_h <= 0 or usable_w <= 0:
+            raise ValueError('Margins and gaps leave no space for axes')
+
+        h_ax = usable_h / nrow
+        w_ax = usable_w / ncol
+
+    if h_fig <= 0 or w_fig <= 0:
+        raise ValueError('Computed figure size is not positive')
+
+    # ------------------------------------------------------------
+    # Compute normalized tight layout values (merged from _dict_tight_from_cm)
+    # ------------------------------------------------------------
+    if min(gap_h, gap_w, mh0, mh1, mw0, mw1) < 0:
+        raise ValueError('gap/margins must be non-negative')
+
+    fig_layout = {
+        # absolute (cm)
+        'figsize': (h_fig, w_fig),
+        'subsize_cm': (h_ax, w_ax),
+        'gap_cm': (gap_h, gap_w),
+        'marg_h_cm': (mh0, mh1),
+        'marg_w_cm': (mw0, mw1),
+
+        # normalized (0..1), compatible with figure.subplot(...)
+        'gap':    [gap_h / h_fig, gap_w / w_fig],
+        'marg_h': [mh0 / h_fig,   mh1 / h_fig],
+        'marg_w': [mw0 / w_fig,   mw1 / w_fig],
+    }
+
+    return fig_layout
+
+
+
+def layout_old(
     nrow,
     ncol,
     *,

@@ -17,6 +17,266 @@ def plotxy(
     *,
     labels=None,
     color=None,
+    linestyle=('-',),
+    linewidth=(1.2,),
+    marker=(None,),
+    alpha=(1.0,),
+    xlabel='x',
+    ylabel=None,
+    suptitle='',
+    ylog=False,
+    legend=True,
+    cursor=False,
+    ncols=None,
+    layout_kwargs=None,
+    legend_kwargs=None,
+    **plot_kwargs
+):
+    """
+    Multi-source row-wise plotting utility.
+    """
+
+    # -------------------------------------------------
+    # helpers
+    # -------------------------------------------------
+
+    def _to_n(x, n, name):
+        if isinstance(x, (str, bytes)) or not isinstance(x, (list, tuple)):
+            return [x] * n
+        x = list(x)
+        if len(x) == 1:
+            return x * n
+        if len(x) != n:
+            raise ValueError(f'{name} length ({len(x)}) must be 1 or {n}')
+        return x
+
+    # -------------------------------------------------
+    # normalize inputs
+    # -------------------------------------------------
+
+    if not isinstance(x_list, (list, tuple)):
+        x_list = [x_list]
+
+    if not isinstance(y_list, (list, tuple)):
+        y_list = [y_list]
+
+    n_source = len(y_list)
+    
+    if len(x_list) == 1 and n_source > 1:
+        x_list = x_list * n_source
+
+    if len(x_list) != n_source:
+        raise ValueError(
+            f'x_list length ({len(x_list)}) does not match '
+            f'y_list length ({n_source})'
+        )
+
+    
+    x_list = [_to_1d(x) for x in x_list]
+    y_list = [_to_2d(y) for y in y_list]
+
+    n_signal = y_list[0].shape[0]
+
+    rows = []
+    errors = []
+
+    for j, (x, y) in enumerate(zip(x_list, y_list)):
+        rows.append((j, x.size, *y.shape))
+
+        if y.shape[0] != n_signal:
+            errors.append(
+                f'y_list[{j}]: rows={y.shape[0]} (expected {n_signal})'
+            )
+        if y.shape[1] != x.size:
+            errors.append(
+                f'idx {j}: x.size={x.size}, y.cols={y.shape[1]}'
+            )
+
+    if errors:
+        header = ' idx (source) | x.size | y.rows | y.cols '
+        sep = '-' * len(header)
+        table = '\n'.join(
+            f'{j:4d} | {xs:6d} | {yr:6d} | {yc:6d}'
+            for j, xs, yr, yc in rows
+        )
+
+        raise ValueError(
+            'Input dimension check failed:\n'
+            + '\n'.join(errors)
+            + '\n\nOverview of all sources:\n'
+            + header + '\n' + sep + '\n' + table
+        )
+
+    # -------------------------------------------------
+    # defaults and broadcast styling
+    # -------------------------------------------------
+
+    if labels is None:
+        labels = [str(j + 1) for j in range(n_source)]
+    if len(labels) != n_source:
+        raise ValueError(
+            f'labels length ({len(labels)}) must match number of sources ({n_source})'
+        )
+
+    if ylabel is None:
+        ylabel = [f'$y_{i+1}$' for i in range(n_signal)]
+    if len(ylabel) != n_signal:
+        raise ValueError(
+            f'ylabel length ({len(ylabel)}) must match number of rows ({n_signal})'
+        )
+
+    if color is None:
+        color = misc.color(n_source)
+    
+    linestyle = _to_n(linestyle, n_source, 'linestyle')
+    linewidth = _to_n(linewidth, n_source, 'linewidth')
+    marker = _to_n(marker, n_source, 'marker')
+    alpha = _to_n(alpha, n_source, 'alpha')
+
+    if len(color) != n_source:
+        raise ValueError(f'color length ({len(color)}) must match number of sources')
+    
+    # -------------------------------------------------
+    # subplot layout logic
+    # -------------------------------------------------
+
+    if ncols is None:
+        ncols = 1
+
+    max_rows_per_fig = 6 if ncols == 1 else n_signal
+    max_figs = 8
+
+    figs = []
+    axes_all = []
+    lines_all = []
+
+    n_figs = int(np.ceil(n_signal / max_rows_per_fig))
+    if n_figs > max_figs:
+        print('Warning: more than 8 figures requested. Truncating output.')
+        n_figs = max_figs
+
+    for f in range(n_figs):
+        i0 = f * max_rows_per_fig
+        i1 = min((f + 1) * max_rows_per_fig, n_signal)
+        nrows = int(np.ceil((i1 - i0) / ncols))
+
+        # Avoid recomputing layout if provided
+        lk = layout_kwargs
+        if lk is None:
+            _, lk, _ = figure.layout(nrows, ncols)
+                                      
+                                                 
+        axes, fig, _ = figure.subplot(nrows, ncols, **(lk or {}))
+        axes = np.atleast_1d(axes)
+
+        figs.append(fig)
+        axes_all.append(axes)
+
+        legend_handles = []
+        per_fig_lines = []
+
+        for local_i, global_i in enumerate(range(i0, i1)):
+            ax = axes[local_i]
+            ax_lines = []
+
+            for j in range(n_source):
+                h, = ax.plot(
+                    x_list[j],
+                    y_list[j][global_i, :],
+                    color=color[j],
+                    linestyle=linestyle[j],
+                    linewidth=linewidth[j],
+                    marker=marker[j],
+                    alpha=alpha[j],
+                    label=labels[j],
+                    **plot_kwargs
+                )
+                ax_lines.append(h)
+
+                if global_i == 0:
+                    legend_handles.append(h)
+
+            if ylog:
+                ax.set_yscale('log')
+
+            ax.set_ylabel(ylabel[global_i])
+            ax.grid(True)
+
+            if ylog:
+                figure.axistight(ax, p=(0, 0.05), axes=('x','ylog'))
+            else:
+                figure.axistight(ax, p=(0, 0.05), axes=('x','y'))
+
+            if cursor:
+                mplcursors.cursor(ax, hover=False)
+
+            per_fig_lines.append(ax_lines)
+
+        for idx, ax in enumerate(axes):
+            row = idx // ncols
+            if row == nrows - 1:
+                ax.set_xlabel(xlabel)
+
+        if suptitle != '':
+            fig.suptitle(suptitle, fontweight='bold', fontsize=10)
+
+        if legend:
+            legend_kwargs = legend_kwargs or {}
+            
+            # 1. Get the boundaries of your subplots
+            right_edge = max(ax.get_position().x1 for ax in fig.axes)
+            top_edge = max(ax.get_position().y1 for ax in fig.axes)
+        
+            # 2. Define your small vertical gap (e.g., 1% of figure height)
+            vertical_gap = 0.02
+            
+            fig.legend(
+                legend_handles,
+                labels,
+                # 'lower right' pins the BOTTOM-RIGHT corner of the legend.
+                # This ensures it sits ABOVE the plot and grows LEFT.
+                loc='lower right',
+                bbox_to_anchor=(right_edge, top_edge + vertical_gap),
+                bbox_transform=fig.transFigure,
+                ncol=n_source,
+                columnspacing=1.0,   # Distance between the 2 items (default is 2.0)
+                handlelength=1.5,    # Length of the colored lines (default is 2.0)
+                handletextpad=0.5,   # Distance between line and its text (default is 0.8)
+                borderaxespad=0,     # Keeps the right edge flush
+                frameon=True,
+                **legend_kwargs
+            )
+
+        figure.size(fig)
+        figure.log_toggle(fig, key='l')
+        figure.enable_popout(fig, key='p')
+
+        lines_all.append(per_fig_lines)
+
+
+    fig_out={
+        'fig': figs[0],
+        'axes': axes_all[0],
+        'lines': lines_all[0],
+        'meta': {
+            'n_source': n_source,
+            'n_signal': n_signal,
+            'ncols': ncols,
+            'ylog': ylog,
+            'labels': labels,
+            'ylabel': ylabel
+        }
+    }
+
+    return fig_out
+
+
+def plotxy_old(
+    x_list,
+    y_list,
+    *,
+    labels=None,
+    color=None,
     linestyle=['-'],
     linewidth=[1.2],
     xlabel='x',
@@ -351,9 +611,9 @@ def plot3d(x, y, **plotxy_kwargs):
     
 
     # Single plotxy call
-    figs, axes_all=plotxy(x_list, y_list, **plotxy_kwargs)
+    fig_out=plotxy(x_list, y_list, **plotxy_kwargs)
     
-    return figs, axes_all
+    return fig_out
     
     
 #%%
