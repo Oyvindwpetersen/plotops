@@ -64,7 +64,7 @@ fig_out = plotops.plot.plotxy(
 
 plotops.print.savefig(fig_out['fig'],'plot_example_1','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 ```
-<img src="examples/plot_example_1.png" width="100%">
+<img src="examples/plot_example_1.png" width="500">
 
 ## Example 2
 
@@ -95,7 +95,7 @@ fig_out= plotops.plot.plotxy(
 plotops.print.savefig(fig_out['fig'],'plot_example_2','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 
 ```
-<img src="examples/plot_example_2.png" width="100%">
+<img src="examples/plot_example_2.png" width="500">
 
 ## Example 3
 
@@ -122,7 +122,7 @@ fig_out=  plotops.plot.plotxy(
 
 plotops.print.savefig(fig_out['fig'],'plot_example_3','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 ```
-<img src="examples/plot_example_3.png" width="100%">
+<img src="examples/plot_example_3.png" width="2430">
 
 ## Example 4
 
@@ -169,4 +169,5 @@ fig_out=plotops.plot.plot3d([x,x,x2],[A,B,C],
 plotops.print.savefig(fig_out['fig'],'plot_example_4','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 
 ```
-<img src="examples/plot_example_4.png" width="100%">
+<img src="examples/plot_example_4.png" width="2430">
+
