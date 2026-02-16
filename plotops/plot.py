@@ -26,14 +26,26 @@ def plotxy(
     suptitle='',
     ylog=False,
     legend=True,
-    cursor=False,
+    cursor=True,
     ncols=None,
     layout_kwargs=None,
     legend_kwargs=None,
     **plot_kwargs
 ):
     """
-    Multi-source row-wise plotting utility.
+    Plot multiple data sources row-wise.
+    
+    Parameters
+    ----------
+    x_list : array-like or list
+    y_list : array-like or list (2D per source)
+    labels : list of str, optional
+    ncols : int, optional
+    
+    Returns
+    -------
+    dict
+        Figure, axes, lines, and metadata.
     """
 
     # -------------------------------------------------
@@ -161,12 +173,10 @@ def plotxy(
         nrows = int(np.ceil((i1 - i0) / ncols))
 
         # Avoid recomputing layout if provided
-        lk = layout_kwargs
-        if lk is None:
-            _, lk, _ = figure.layout(nrows, ncols)
+        if layout_kwargs is None:
+            layout_kwargs = figure.layout(nrows, ncols)
                                       
-                                                 
-        axes, fig, _ = figure.subplot(nrows, ncols, **(lk or {}))
+        axes, fig, _ = figure.subplot(nrows, ncols, **(layout_kwargs or {}))
         axes = np.atleast_1d(axes)
 
         figs.append(fig)
@@ -563,22 +573,20 @@ def _to_2d(y):
     return y
 
 #%%
+
 def plot3d(x, y, **plotxy_kwargs):
     """
-    Plot multiple 3D matrices by flattening and forwarding to plotxy.
-
+    Plot list of 3D matrices using 2D flattening.
+    
     Parameters
     ----------
     x : array-like
-        Common x-axis.
-    y : list of ndarray
-        Each array of shape (n1, n2, n3).
-    plotxy_kwargs : dict
-        Passed directly to plotxy.
-
+    y : list of ndarray (n1, n2, n3)
+    
     Returns
     -------
-    figs, axes_all
+    dict
+        Output from plotxy.
     """
 
     # Ensure y is iterable

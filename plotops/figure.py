@@ -1004,6 +1004,15 @@ def popout_active_axes(fig, state):
     return new_fig, new_ax
 
 def enable_popout(fig, key='p'):
+    """
+    Enable pop-out of active axes into new figure.
+
+    Parameters
+    ----------
+    fig : Figure
+    key : str
+        Keyboard trigger.
+    """
     state = enable_active_axes_tracking(fig)
 
     def on_key(event):
