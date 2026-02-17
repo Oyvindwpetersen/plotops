@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Dec 20 12:20:03 2025
-
-@author: oyvinpet
-"""
 #%%
 
 import numpy as np
@@ -14,7 +8,7 @@ sys.path.append(r'C:\Cloud\OD_OWP\Work\Python\Github\plotops')
 
 import plotops
 
-#%% Test plot 2D
+#%% Test plot row (single)
 
 plt.close('all')
 
@@ -29,11 +23,11 @@ fig_layout=plotops.figure.layout(1,1)
 fig_out = plotops.plot.plotxy(
     [x1, x2],
     [y1, y2],
-    labels=['case A','case B'])
+    labels=['Case A','Case B'])
 
-plotops.print.savefig(fig_out['fig'],'plot_test_1c','.',figsize=fig_layout['figsize'])
+plotops.print.savefig(fig_out['fig'],'plot_example_1','.',figsize=fig_layout['figsize'])
 
-#%% Test plot 2D
+#%% Test plot row (multiple)
 
 plt.close('all')
 
@@ -41,12 +35,11 @@ x1 = np.linspace(0, 10, 100)
 x2 = np.linspace(0, 10, 400)
 x3 = np.linspace(0, 10, 200)
 
-y1 = np.vstack((20*np.cos(x1),30*np.cos(x1)**4))
-y2 = np.vstack((20*np.sin(x2),30*np.sin(x2)**4))
-y3 = np.vstack((-10*np.sin(3*x3)+50,20*np.sin(2*x3)))
+y1 = np.vstack((2*np.cos(x1),3*np.cos(x1)**4))
+y2 = np.vstack((2*np.sin(x2)+5,3*np.sin(x2)**4))
+y3 = np.vstack((np.sin(2*x3)-5,2*np.sin(2*x3)))
 
-fig_layout = plotops.figure.layout(1,2)
-#fig_layout = plotops.figure.layout(2,1)
+fig_layout = plotops.figure.layout(2,1)
 
 fig_out= plotops.plot.plotxy(
     [x1, x2, x3],
@@ -54,14 +47,12 @@ fig_out= plotops.plot.plotxy(
     labels=['Case A','Case B','Case C'],
     xlabel='t [s]',
     ylabel=[f'$Y_{i+1}$ [kN]' for i in range(2)],
-    legend=True,
-    cursor=True,
-    ncols=2,
+    ncols=1,
     layout_kwargs=fig_layout)
 
-plotops.print.savefig(fig_out['fig'],'plot_test_2c','.',figsize=fig_layout['figsize'])
+plotops.print.savefig(fig_out['fig'],'plot_example_2','.',figsize=fig_layout['figsize'])
 
-#%% Layout from 1 column to multiple
+#%% Test plot row (multiple, with restack)
 
 plt.close('all')
 
@@ -76,38 +67,39 @@ fig_out=  plotops.plot.plotxy(
     x_list=[x],
     y_list=[y1, y2],
     ncols=3,
+    suptitle='Main title',
+    legend=False,
     layout_kwargs=fig_layout
 )
 
-plotops.print.savefig(fig_out['fig'],'plot_test_3c','.',figsize=fig_layout['figsize'])
+plotops.print.savefig(fig_out['fig'],'plot_example_3','.',figsize=fig_layout['figsize'])
 
-#%% Test plot 3D rectangular
+#%% Test plot 3D
 
 plt.close('all')
 
-x=np.linspace(0,2,10)
-A=np.zeros([2,3,10])
+x=np.linspace(0,2,100)
+A=np.zeros([2,3,100])
 
-A[0,0,:]=10*np.exp(-x)
-A[0,1,:]=np.exp(-x)
-A[0,2,:]=20*np.exp(-x)
-A[1,0,:]=np.exp(-0.1*x**2)
-A[1,1,:]=20*np.exp(-x)
-A[1,2,:]=30*np.exp(-x)
+A[0,0,:]=1e1*np.exp(-x)
+A[0,1,:]=1e2*np.exp(-2*x)
+A[0,2,:]=1e3*np.exp(-3*x)
+A[1,0,:]=1e1*np.exp(-x)
+A[1,1,:]=1e1*np.exp(-2*x)
+A[1,2,:]=1e1*np.exp(-3*x)
 
-B=A+2
+B=A+2.0
 
-x2=np.linspace(0,2,20)
+x2=np.linspace(0,2,200)
 
-C=np.zeros([2,3,20])
+C=np.zeros([2,3,200])
 
-C[0,0,:]=10*np.exp(-x2*2)
-C[0,1,:]=np.exp(-x2*2)
-C[0,2,:]=20*np.exp(-x2*2)
-C[1,0,:]=np.exp(-x2**2)
-C[1,1,:]=20*np.exp(-x2*2)
-C[1,2,:]=30*np.exp(-x2*2)
-
+C[0,0,:]=1e1*np.exp(-x2**2)
+C[0,1,:]=1e2*np.exp(-x2-x2**2)
+C[0,2,:]=1e3*np.exp(-x2-x2**2)
+C[1,0,:]=1e1*np.exp(-x2**0.5)
+C[1,1,:]=1e1*np.exp(-2*x2**0.5)
+C[1,2,:]=1e1*np.exp(-3*x2**0.5)
 
 fig_layout=plotops.figure.layout(2,3)
 
@@ -117,12 +109,11 @@ fig_out=plotops.plot.plot3d([x,x,x2],[A,B,C],
                     labels=['Data','Num','Test series'],
                     linestyle=['-','--','-'],
                     ylog=True,
-                    suptitle='Main title',
                     layout_kwargs=fig_layout)
 
 # plotops.figure.size(fig)
 
-plotops.print.savefig(fig_out['fig'],'plot_test_4c','.',figsize=fig_layout['figsize'])
+plotops.print.savefig(fig_out['fig'],'plot_example_4','.',figsize=fig_layout['figsize'])
 
 
 #%%
@@ -158,4 +149,3 @@ fig_out=plotops.plot.plotxy(
     legend=True,
     ncols=1
 )
-
