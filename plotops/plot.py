@@ -24,6 +24,7 @@ def plotxy(
     xlabel='x',
     ylabel=None,
     suptitle='',
+    xlog=False,
     ylog=False,
     legend=True,
     cursor=True,
@@ -65,27 +66,34 @@ def plotxy(
     # -------------------------------------------------
     # normalize inputs
     # -------------------------------------------------
-
-    if not isinstance(x_list, (list, tuple)):
-        x_list = [x_list]
-
+    
     if not isinstance(y_list, (list, tuple)):
         y_list = [y_list]
-
+    
+    # Convert y first so shape is known
+    y_list = [_to_2d(y) for y in y_list]
     n_source = len(y_list)
+    
+    # Handle missing x_list
+    if x_list is None or (isinstance(x_list, (list, tuple)) and len(x_list) == 0):
+        N = y_list[0].shape[1]
+        x_default = np.arange(1, N + 1)
+        x_list = [x_default.copy() for _ in range(n_source)]
+    
+    # Now normalize x_list
+    if not isinstance(x_list, (list, tuple)):
+        x_list = [x_list]
     
     if len(x_list) == 1 and n_source > 1:
         x_list = x_list * n_source
-
+    
+    x_list = [_to_1d(x) for x in x_list]
+    
     if len(x_list) != n_source:
         raise ValueError(
             f'x_list length ({len(x_list)}) does not match '
             f'y_list length ({n_source})'
         )
-
-    
-    x_list = [_to_1d(x) for x in x_list]
-    y_list = [_to_2d(y) for y in y_list]
 
     n_signal = y_list[0].shape[0]
 
@@ -132,6 +140,8 @@ def plotxy(
 
     if ylabel is None:
         ylabel = [f'$y_{i+1}$' for i in range(n_signal)]
+    if isinstance(ylabel, str):
+        ylabel=[ylabel]
     if len(ylabel) != n_signal:
         raise ValueError(
             f'ylabel length ({len(ylabel)}) must match number of rows ({n_signal})'
@@ -206,6 +216,9 @@ def plotxy(
                 if global_i == 0:
                     legend_handles.append(h)
 
+            if xlog:
+                ax.set_xscale('log')
+                
             if ylog:
                 ax.set_yscale('log')
 
