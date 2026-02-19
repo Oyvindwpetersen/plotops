@@ -602,9 +602,13 @@ def plot3d(x, y, **plotxy_kwargs):
         Output from plotxy.
     """
 
-    # Ensure y is iterable
-    if not isinstance(y, (list, tuple)):
-        raise ValueError('y must be a list (or tuple) of 3D arrays')
+    if isinstance(y, np.ndarray):
+        # Single 3D array
+        y_list = [y]
+        
+    #Ensure y is iterable
+     if not isinstance(y, (list, tuple)):
+         raise ValueError('y must be a list (or tuple) of 3D arrays')
 
     y_list = []
     x_list = x
