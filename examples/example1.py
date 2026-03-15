@@ -25,7 +25,7 @@ fig_out = plotops.plot.plotxy(
     [y1, y2],
     labels=['Case A','Case B'])
 
-plotops.print.savefig(fig_out['fig'],'plot_example_1','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
+# plotops.print.savefig(fig_out['fig'],'plot_example_1','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 
 #%% Test plot row (multiple)
 
