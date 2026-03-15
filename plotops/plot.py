@@ -26,6 +26,7 @@ def plotxy(
     suptitle='',
     xlog=False,
     ylog=False,
+    xlim=None,
     legend=True,
     cursor=True,
     ncols=None,
@@ -229,6 +230,8 @@ def plotxy(
                 figure.axistight(ax, p=(0, 0.05), axes=('x','ylog'))
             else:
                 figure.axistight(ax, p=(0, 0.05), axes=('x','y'))
+                
+            if xlim is not None: ax.set_xlim(xlim)
 
             if cursor:
                 mplcursors.cursor(ax, hover=False)
@@ -607,8 +610,8 @@ def plot3d(x, y, **plotxy_kwargs):
         y_list = [y]
         
     #Ensure y is iterable
-     if not isinstance(y, (list, tuple)):
-         raise ValueError('y must be a list (or tuple) of 3D arrays')
+    if not isinstance(y, (list, tuple)):
+        raise ValueError('y must be a list (or tuple) of 3D arrays')
 
     y_list = []
     x_list = x
@@ -640,7 +643,119 @@ def plot3d(x, y, **plotxy_kwargs):
     
     return fig_out
     
-    
+#%%
+
+from matplotlib.colors import LogNorm
+
+def matrix_grid(
+    M,
+    xlabels=None,
+    ylabels=None,
+    ax=None,
+    cmap='viridis',
+    vmin=None,
+    vmax=None,
+    scale='linear',          # 'linear' or 'log'
+    show_values=False,
+    value_fmt='{:.2e}',
+    colorbar=True,
+    title='Matrix plot',
+):
+    """
+    Plot a matrix as a colored grid.
+
+    Parameters
+    ----------
+    M : ndarray, shape (ny, nx)
+        Matrix to plot.
+    xlabels : list of str, optional
+        Tick labels for columns.
+    ylabels : list of str, optional
+        Tick labels for rows.
+    ax : matplotlib Axes, optional
+        Axes to plot into. If None, a new figure is created.
+    cmap : str
+        Colormap.
+    vmin, vmax : float, optional
+        Color scale limits.
+    scale : {'linear', 'log'}
+        Color scaling.
+    show_values : bool
+        If True, annotate each cell with its value.
+    value_fmt : str
+        Format string for annotations.
+    colorbar : bool
+        If True, show colorbar.
+    title : str
+        Figure title.
+    """
+
+    M = np.asarray(M)
+    if M.ndim != 2:
+        raise ValueError('M must be a 2D matrix')
+
+    ny, nx = M.shape
+
+    if xlabels is not None and len(xlabels) != nx:
+        raise ValueError('xlabels must have length equal to number of columns')
+    if ylabels is not None and len(ylabels) != ny:
+        raise ValueError('ylabels must have length equal to number of rows')
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(1.1 * nx, 1.1 * ny))
+    else:
+        fig = ax.figure
+
+    if scale == 'log':
+        if np.any(M <= 0):
+            raise ValueError('Log scale requires strictly positive values')
+        norm = LogNorm(vmin=vmin, vmax=vmax)
+        im = ax.imshow(M, cmap=cmap, norm=norm)
+    elif scale == 'linear':
+        im = ax.imshow(M, cmap=cmap, vmin=vmin, vmax=vmax)
+    else:
+        raise ValueError("scale must be 'linear' or 'log'")
+
+    ax.set_xticks(np.arange(nx))
+    ax.set_yticks(np.arange(ny))
+
+    if xlabels is not None:
+        ax.set_xticklabels(xlabels)
+    if ylabels is not None:
+        ax.set_yticklabels(ylabels)
+
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    ax.set_title(title, pad=20)
+
+    # Grid lines
+    ax.set_xticks(np.arange(-0.5, nx, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, ny, 1), minor=True)
+    ax.grid(which='minor', color='k', linestyle='-', linewidth=0.3)
+    ax.tick_params(which='minor', bottom=False, left=False)
+
+    if show_values:
+        for i in range(ny):
+            for j in range(nx):
+                val = M[i, j]
+                ax.text(
+                    j, i,
+                    value_fmt.format(val),
+                    ha='center',
+                    va='center',
+                    fontsize=8,
+                    color='white' if im.norm(val) > 0.6 else 'black',
+                )
+
+    if colorbar:
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Value')
+
+    ax.set_aspect('equal')
+    fig.tight_layout()
+
+    return ax
+
+
 #%%
 
 def corr(
