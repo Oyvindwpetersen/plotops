@@ -10,6 +10,118 @@ import os
 #%%
 
 def subplot(nh, nw,
+            layout=None,
+            *,
+            gap=0.05,
+            marg_h=0.1,
+            marg_w=0.05,
+            weight_h=None,
+            weight_w=None,
+            fig=None,
+            skipaxes=False,
+            **kwargs):
+    '''
+    MATLAB-equivalent tight_subplot using absolute normalized gaps and margins.
+
+    This version optionally accepts a layout dictionary returned from
+    `figure.layout(...)`.
+
+    Parameters
+    ----------
+    nh, nw : int
+        Number of rows and columns.
+
+    layout : dict, optional
+        Dictionary returned by `layout(...)`. If provided,
+        its normalized 'gap', 'marg_h', 'marg_w' values are used.
+
+    Other parameters
+    ----------------
+    Same behavior as before.
+
+    Returns
+    -------
+    axes : list of Axes
+    fig  : matplotlib.figure.Figure
+    pos  : list of [left, bottom, width, height]
+    '''
+
+    # -------------------------------------------------
+    # Unpack layout dict if provided
+    # -------------------------------------------------
+    if isinstance(layout, dict):
+        gap = layout.get('gap', gap)
+        marg_h = layout.get('marg_h', marg_h)
+        marg_w = layout.get('marg_w', marg_w)
+
+        # Optional: apply figure size automatically
+        if 'figsize' in layout:
+            h_cm, w_cm = layout['figsize']
+            if fig is None:
+                import matplotlib.pyplot as plt
+                fig = plt.figure()
+            cm = 1 / 2.54
+            fig.set_size_inches(w_cm * cm, h_cm * cm, forward=True)
+
+    # -------------------------------------------------
+    # Normalize inputs (unchanged logic)
+    # -------------------------------------------------
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    if fig is None:
+        fig = plt.figure()
+
+    if np.isscalar(gap):
+        gap = (gap, gap)
+    if np.isscalar(marg_h):
+        marg_h = (marg_h, marg_h)
+    if np.isscalar(marg_w):
+        marg_w = (marg_w, marg_w)
+
+    if weight_h is None:
+        weight_h = np.ones(nh)
+    if weight_w is None:
+        weight_w = np.ones(nw)
+
+    weight_h = np.asarray(weight_h, dtype=float)
+    weight_w = np.asarray(weight_w, dtype=float)
+
+    weight_h /= weight_h.sum()
+    weight_w /= weight_w.sum()
+
+    H = 1.0 - sum(marg_h) - gap[0] * (nh - 1)
+    W = 1.0 - sum(marg_w) - gap[1] * (nw - 1)
+
+    if H <= 0 or W <= 0:
+        raise ValueError('Margins and gaps leave no space for axes')
+
+    axh = H * weight_h
+    axw = W * weight_w
+
+    axes = []
+    pos = []
+
+    y = 1.0 - marg_h[1]
+    for ih in range(nh):
+        y -= axh[ih]
+        x = marg_w[0]
+
+        for iw in range(nw):
+            p = [x, y, axw[iw], axh[ih]]
+            pos.append(p)
+
+            if not skipaxes:
+                axes.append(fig.add_axes(p))
+
+            x += axw[iw] + gap[1]
+
+        y -= gap[0]
+
+    return axes, fig, pos
+
+
+def subplot_old(nh, nw,
                   gap=0.05,
                   marg_h=0.1,
                   marg_w=0.05,
