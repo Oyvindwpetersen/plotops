@@ -3,6 +3,7 @@
 import os
 import sys
 import subprocess
+import string
 
 #%%
 
@@ -16,6 +17,17 @@ def _open_file(path):
         subprocess.run(['open', path], check=False)
     else:
         subprocess.run(['xdg-open', path], check=False)
+
+
+def _index_to_letters(i):
+    """Convert 0-based index to letters: 0->a, 25->z, 26->aa."""
+    letters = string.ascii_lowercase
+    out = []
+    i += 1  # switch to 1-based for base-26 conversion
+    while i > 0:
+        i, rem = divmod(i - 1, 26)
+        out.append(letters[rem])
+    return ''.join(reversed(out))
 
 
 def savefig(
@@ -32,7 +44,11 @@ def savefig(
     dpi=1200,
     renderer=None,
     tight=False,
-    openfile=True
+    openfile=True,
+    panel_labels=True,
+    panel_loc=(-0.14, -0.10),
+    panel_suffix=')',
+    panel_weight='semibold'
 ):
     """
     Save a matplotlib figure with consistent publication settings.
@@ -67,6 +83,15 @@ def savefig(
         Use bbox_inches='tight'.
     openfile : bool
         If True, open only the first saved file in the `formats` list.
+    panel_labels : bool or iterable of str
+        If True, add subplot labels ('a)', 'b)', ... ) at save time only.
+        If iterable, use the provided labels in axis order.
+    panel_loc : (float, float)
+        Label position in axes coordinates (default: lower-left outside axes).
+    panel_suffix : str
+        Suffix appended to auto-generated labels.
+    panel_weight : str
+        Font weight for panel labels (default: semibold).
     """
 
     # --- ensure formats iterable ---
@@ -112,6 +137,31 @@ def savefig(
                 txt.set_fontsize(legend_size)
                 txt.set_fontname(fontname)
 
+    # --- panel labels only for export ---
+    panel_artists = []
+    if panel_labels and len(fig.axes) > 1:
+        if isinstance(panel_labels, bool):
+            labels = [_index_to_letters(i) + panel_suffix for i in range(len(fig.axes))]
+        else:
+            labels = list(panel_labels)
+            if len(labels) < len(fig.axes):
+                raise ValueError('panel_labels iterable must have at least one label per axis')
+
+        for i, ax in enumerate(fig.axes):
+            va = 'top' if panel_loc[1] < 0 else 'bottom'
+            t = ax.text(
+                panel_loc[0],
+                panel_loc[1],
+                labels[i],
+                transform=ax.transAxes,
+                ha='left',
+                va=va,
+                fontsize=title_size,
+                fontname=fontname,
+                fontweight=panel_weight
+            )
+            panel_artists.append(t)
+
     # --- save ---
     first_out = None
     for k, fmt in enumerate(formats):
@@ -128,6 +178,10 @@ def savefig(
             first_out = out
 
         print(f'saving {filename} to {print_folder} in {fmt}')
+
+    # --- remove temporary panel labels so interactive view stays unchanged ---
+    for artist in panel_artists:
+        artist.remove()
 
     # --- open only first saved file ---
     if openfile and first_out is not None:
