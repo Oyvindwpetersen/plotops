@@ -230,7 +230,7 @@ def layout(
     figsize=None,
     gap=(1.5, 2.0),
     marg_h=(1.2, 1.0),
-    marg_w=(1.5, 0.8),
+    marg_w=(2, 0.8),
     latex=None,
     aspect=None
 ):
