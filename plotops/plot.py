@@ -249,6 +249,21 @@ def plotxy(
         if legend:
             legend_kwargs = legend_kwargs or {}
             
+            # Reorder legend to row-wise
+            ncol = min(n_source, 5)
+            n = len(labels)
+            nrow = int(np.ceil(n / ncol))
+            
+            order = []
+            for c in range(ncol):
+                for r in range(nrow):
+                    idx = r * ncol + c
+                    if idx < n:
+                        order.append(idx)
+            
+            legend_handles = [legend_handles[i] for i in order]
+            labels = [labels[i] for i in order]            
+            
             # 1. Get the boundaries of your subplots
             right_edge = max(ax.get_position().x1 for ax in fig.axes)
             top_edge = max(ax.get_position().y1 for ax in fig.axes)
@@ -264,7 +279,7 @@ def plotxy(
                 loc='lower right',
                 bbox_to_anchor=(right_edge, top_edge + vertical_gap),
                 bbox_transform=fig.transFigure,
-                ncol=n_source,
+                ncol=ncol,
                 columnspacing=1.0,   # Distance between the 2 items (default is 2.0)
                 handlelength=1.5,    # Length of the colored lines (default is 2.0)
                 handletextpad=0.5,   # Distance between line and its text (default is 0.8)
