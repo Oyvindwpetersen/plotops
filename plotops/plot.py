@@ -32,6 +32,7 @@ def plotxy(
     ncols=None,
     layout_kwargs=None,
     legend_kwargs=None,
+    return_all=False,
     **plot_kwargs
 ):
     """
@@ -43,6 +44,8 @@ def plotxy(
     y_list : array-like or list (2D per source)
     labels : list of str, optional
     ncols : int, optional
+    return_all : bool, optional
+        If True, include all generated figures and axes groups in the output.
     
     Returns
     -------
@@ -184,10 +187,9 @@ def plotxy(
         nrows = int(np.ceil((i1 - i0) / ncols))
 
         # Avoid recomputing layout if provided
-        if layout_kwargs is None:
-            layout_kwargs = figure.layout(nrows, ncols)
+        fig_layout = layout_kwargs if layout_kwargs is not None else figure.layout(nrows, ncols)
                                       
-        axes, fig, _ = figure.subplot(nrows, ncols, **(layout_kwargs or {}))
+        axes, fig, _ = figure.subplot(nrows, ncols, **(fig_layout or {}))
         axes = np.atleast_1d(axes)
 
         figs.append(fig)
@@ -262,7 +264,7 @@ def plotxy(
                         order.append(idx)
             
             legend_handles = [legend_handles[i] for i in order]
-            labels = [labels[i] for i in order]            
+            legend_labels = [labels[i] for i in order]
             
             # 1. Get the boundaries of your subplots
             right_edge = max(ax.get_position().x1 for ax in fig.axes)
@@ -273,7 +275,7 @@ def plotxy(
             
             fig.legend(
                 legend_handles,
-                labels,
+                legend_labels,
                 # 'lower right' pins the BOTTOM-RIGHT corner of the legend.
                 # This ensures it sits ABOVE the plot and grows LEFT.
                 loc='lower right',
@@ -308,6 +310,11 @@ def plotxy(
             'ylabel': ylabel
         }
     }
+
+    if return_all:
+        fig_out['figs'] = figs
+        fig_out['axes_all'] = axes_all
+        fig_out['lines_all'] = lines_all
 
     return fig_out
 
@@ -621,10 +628,8 @@ def plot3d(x, y, **plotxy_kwargs):
     """
 
     if isinstance(y, np.ndarray):
-        # Single 3D array
-        y_list = [y]
-        
-    #Ensure y is iterable
+        y = [y]
+
     if not isinstance(y, (list, tuple)):
         raise ValueError('y must be a list (or tuple) of 3D arrays')
 
@@ -780,7 +785,7 @@ def corr(
     cmap='coolwarm',
     vmin=-1.0,
     vmax=1.0,
-    show_values=True,
+    show_values=False,
     value_fmt='{:.2f}',
     colorbar=True,
     title='Correlation matrix',
@@ -826,7 +831,7 @@ def corr(
 
     # Labels
     if labels is None:
-        labels = [f'$x_{i+1}$' for i in range(n)]
+        labels = [f'$x_{{{i+1}}}$' for i in range(n)]
     if len(labels) != n:
         raise ValueError('labels must have length n')
 
@@ -1112,5 +1117,8 @@ def isoline_segments_on_triangulation(tri, f, levels):
         out.append((v, np.asarray(segs)))
 
     return out
+
+
+from .legacy import plotxy_old
 
 

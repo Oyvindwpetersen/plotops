@@ -11,6 +11,7 @@ from . import misc
 from . import plot
 from . import print
 from . import figure
+from . import legacy
 
 
 # Plotting
@@ -28,11 +29,13 @@ from .misc import color
 
 __all__ = [
     'multiplot',
+    'plot3d',
     'layout',
     'subplot',
     'axistight',
     'size',
     'tile',
     'savefig',
-    'color'
+    'color',
+    'legacy'
 ]
