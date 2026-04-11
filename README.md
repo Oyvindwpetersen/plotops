@@ -4,14 +4,25 @@ Structured plotting utilities built on top of matplotlib.
 
 `plotops` provides:
 
-- Reproducible subplot layouts (cm-based sizing)
-- Clean multi-source plotting
-- Publication-ready figure control
-- Interactive workflow tools (log toggle, pop-out, tiling)
+- Reproducible subplot layouts with cm-based sizing
+- Clean multi-source plotting helpers
+- Publication-ready export utilities
+- Interactive workflow tools such as log toggle, pop-out, and tiling
 
-Designed for engineering and scientific workflows where layout consistency matter.
+Designed for engineering and scientific workflows where layout consistency matters.
 
----
+## Install
+
+```bash
+pip install plotops
+```
+
+Current runtime dependencies:
+
+- `numpy`
+- `matplotlib`
+- `mplcursors`
+- `PyQt5`
 
 ## Core Modules
 
@@ -19,155 +30,89 @@ Designed for engineering and scientific workflows where layout consistency matte
 
 Layout and figure control:
 
-- `layout()` – compute figure size and normalized layout parameters
-- `subplot()` – tight subplot creation
-- `axistight()` – MATLAB-style axis padding
-- `size()` – resize/position figure window
-- `tile()` – tile all open figures on screen
-- `log_toggle()` – interactive log/linear toggle
-- `enable_popout()` – pop active axes into new figure
-
----
+- `layout()` computes figure size and normalized layout parameters
+- `subplot()` creates tightly controlled subplot grids and can apply labels, log scaling, limits, and grids
+- `axistight()` applies MATLAB-style axis padding
+- `size()` resizes and repositions the figure window
+- `tile()` tiles all open figures on screen
+- `log_toggle()` toggles linear and log scale interactively
+- `enable_popout()` pops the active axes into a new figure
 
 ### `plotops.plot`
 
 High-level plotting utilities:
 
-- `plotxy()` – multi-source row-wise plotting
-- `plot3d()` – structured plotting of 3D matrices
-- `corr()` – covariance → correlation matrix
-- `surfiso()` – triangulated 3D surface with isolines
+- `plotxy()` creates multi-source row-wise plots
+- `plot3d()` flattens 3D matrix data into structured subplot layouts
+- `corr()` converts covariance matrices to correlation plots
+- `surfiso()` plots triangulated 3D surfaces with isolines
 
----
+`plotxy(..., return_all=True)` returns all generated figures, axes groups, and line groups when one call spans multiple figures.
 
-## Example 1
+### `plotops.legacy`
+
+Legacy APIs are kept in `plotops.legacy` so older workflows remain available without crowding the main modules.
+
+## Quickstart
 
 ```python
-#%% Test plot 2D
 import numpy as np
 import plotops
 
-plt.close('all')
-
 x1 = np.linspace(0, 10, 100)
 x2 = np.linspace(0, 10, 400)
+y1 = 20 * np.cos(x1) + 40
+y2 = 20 * np.sin(x2) + 50
 
-y1 = 20*np.cos(x1)+40
-y2 = 20*np.sin(x2)+50
-
-fig_layout=plotops.figure.layout(1,1)
+fig_layout = plotops.figure.layout(1, 1)
 
 fig_out = plotops.plot.plotxy(
     [x1, x2],
     [y1, y2],
-    labels=['Case A','Case B'])
-
-plotops.print.savefig(fig_out['fig'],'plot_example_1','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
-```
-<img src="examples/plot_example_1.png" width="500">
-
-## Example 2
-
-```python
-#%% Test plot 2D
-import numpy as np
-import plotops
-
-x1 = np.linspace(0, 10, 100)
-x2 = np.linspace(0, 10, 400)
-x3 = np.linspace(0, 10, 200)
-
-y1 = np.vstack((2*np.cos(x1),3*np.cos(x1)**4))
-y2 = np.vstack((2*np.sin(x2)+5,3*np.sin(x2)**4))
-y3 = np.vstack((np.sin(2*x3)-5,2*np.sin(2*x3)))
-
-fig_layout = plotops.figure.layout(2,1)
-
-fig_out= plotops.plot.plotxy(
-    [x1, x2, x3],
-    [y1, y2, y3],
-    labels=['Case A','Case B','Case C'],
-    xlabel='t [s]',
-    ylabel=[f'$Y_{i+1}$ [kN]' for i in range(2)],
-    ncols=1,
-    layout_kwargs=fig_layout)
-
-plotops.print.savefig(fig_out['fig'],'plot_example_2','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
-
-```
-<img src="examples/plot_example_2.png" width="500">
-
-## Example 3
-
-```python
-#%% Test plot 2D
-import numpy as np
-import plotops
-
-x = np.linspace(0, 10, 100)
-
-y1 = 20*np.random.randn(6, 100)
-y2 = 20*np.random.rand(6, 100)+10
-
-fig_layout = plotops.figure.layout(2,3)
-
-fig_out=  plotops.plot.plotxy(
-    x_list=[x],
-    y_list=[y1, y2],
-    ncols=3,
-    suptitle='Main title',
-    legend=False,
-    layout_kwargs=fig_layout
+    labels=["Case A", "Case B"],
+    layout_kwargs=fig_layout,
 )
 
-plotops.print.savefig(fig_out['fig'],'plot_example_3','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
+plotops.print.savefig(
+    fig_out["fig"],
+    "plot_example_1",
+    ".",
+    figsize=fig_layout["figsize"],
+    formats=["pdf", "png"],
+)
 ```
-<img src="examples/plot_example_3.png" width="2430">
 
-## Example 4
+## Manual Plotting
+
+For cases where you want the layout helper but will add lines or scatter plots manually:
 
 ```python
-#%% Test plot 2D
-import numpy as np
-import plotops
+layout = plotops.layout(2, 1)
+axes, fig, _ = plotops.subplot(
+    2, 1,
+    layout=layout,
+    xlabel="t [s]",
+    ylabel=["Signal 1", "Signal 2"],
+    ylog=False,
+)
 
-x=np.linspace(0,2,100)
-A=np.zeros([2,3,100])
-
-A[0,0,:]=1e1*np.exp(-x)
-A[0,1,:]=1e2*np.exp(-2*x)
-A[0,2,:]=1e3*np.exp(-3*x)
-A[1,0,:]=1e1*np.exp(-x)
-A[1,1,:]=1e1*np.exp(-2*x)
-A[1,2,:]=1e1*np.exp(-3*x)
-
-B=A+2.0
-
-x2=np.linspace(0,2,200)
-
-C=np.zeros([2,3,200])
-
-C[0,0,:]=1e1*np.exp(-x2**2)
-C[0,1,:]=1e2*np.exp(-x2-x2**2)
-C[0,2,:]=1e3*np.exp(-x2-x2**2)
-C[1,0,:]=1e1*np.exp(-x2**0.5)
-C[1,1,:]=1e1*np.exp(-2*x2**0.5)
-C[1,2,:]=1e1*np.exp(-3*x2**0.5)
-
-fig_layout=plotops.figure.layout(2,3)
-
-fig_out=plotops.plot.plot3d([x,x,x2],[A,B,C],
-                    xlabel='f [Hz]',
-                    linewidth=[1,2,1],
-                    labels=['Data','Num','Test series'],
-                    linestyle=['-','--','-'],
-                    ylog=True,
-                    layout_kwargs=fig_layout)
-
-# plotops.figure.size(fig)
-
-plotops.print.savefig(fig_out['fig'],'plot_example_4','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
-
+axes[0].plot(x, y1)
+axes[1].scatter(x, y2)
 ```
-<img src="examples/plot_example_4.png" width="2430">
+
+## Examples
+
+The example scripts live in [examples](examples):
+
+- [example1.py](examples/example1.py): 2D plotting workflows
+- [example2.py](examples/example2.py): surface and isoline plotting
+- [example3.py](examples/example3.py): matrix-style subplot layouts
+- [example4.py](examples/example4.py): 3D matrix plotting
+
+Example outputs:
+
+<img src="examples/plot_example_1.png" width="500">
+<img src="examples/plot_example_2.png" width="500">
+<img src="examples/plot_example_3.png" width="1200">
+<img src="examples/plot_example_4.png" width="1200">
 
