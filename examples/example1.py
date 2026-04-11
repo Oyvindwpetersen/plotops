@@ -3,8 +3,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from pathlib import Path
 import sys
-sys.path.append(r'C:\Cloud\OD_OWP\Work\Python\Github\plotops')
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import plotops
 
@@ -25,7 +27,7 @@ fig_out = plotops.plot.plotxy(
     [y1, y2],
     labels=['Case A','Case B'])
 
-# plotops.print.savefig(fig_out['fig'],'plot_example_1','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
+# plotops.print.savefig(fig_out['fig'], 'plot_example_1', '.', figsize=fig_layout['figsize'], formats=['pdf', 'png'])
 
 #%% Test plot row (multiple)
 
@@ -51,7 +53,6 @@ fig_out= plotops.plot.plotxy(
     layout_kwargs=fig_layout)
 
 plotops.print.savefig(fig_out['fig'],'plot_example_2','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
-
 #%% Test plot row (multiple, with restack)
 
 plt.close('all')
@@ -147,5 +148,6 @@ fig_out=plotops.plot.plotxy(
     x_list=[x],
     y_list=[y1, y2],
     legend=True,
-    ncols=1
+    ncols=1,
+    return_all=True
 )

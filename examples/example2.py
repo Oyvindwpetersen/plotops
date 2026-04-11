@@ -6,20 +6,19 @@ Created on Mon Dec 22 21:32:25 2025
 """
 
 #%%
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
+from pathlib import Path
 import sys
-sys.path.append(r'C:\Cloud\OD_OWP\Work\Python\Github')
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import plotops
 
 #%%
 
 plt.close('all')
-''
 n1, n2 = 40, 50
 x1 = np.linspace(0.1, 10.0, n1)
 x2 = np.linspace(0.2, 6.0, n2)
