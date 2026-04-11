@@ -18,7 +18,13 @@ def subplot(nh, nw,
             weight_h=None,
             weight_w=None,
             fig=None,
-            skipaxes=False,
+            xlabel=None,
+            ylabel=None,
+            xlog=False,
+            ylog=False,
+            xlim=None,
+            ylim=None,
+            grid=True,
             **kwargs):
     '''
     MATLAB-equivalent tight_subplot using absolute normalized gaps and margins.
@@ -35,9 +41,15 @@ def subplot(nh, nw,
         Dictionary returned by `layout(...)`. If provided,
         its normalized 'gap', 'marg_h', 'marg_w' values are used.
 
-    Other parameters
-    ----------------
-    Same behavior as before.
+    xlabel, ylabel : str | list of str | None
+        Axis labels to apply after subplot creation. `xlabel` is applied to the
+        bottom row axes, while `ylabel` is applied axis-by-axis in row-major order.
+    xlog, ylog : bool | list of bool
+        Log scaling flags. Scalars are broadcast to all axes.
+    xlim, ylim : tuple | list of tuple | None
+        Optional axis limits. Scalars/tuples are broadcast to all axes.
+    grid : bool | list of bool
+        Grid visibility per axis. Scalars are broadcast to all axes.
 
     Returns
     -------
@@ -71,6 +83,18 @@ def subplot(nh, nw,
 
     if fig is None:
         fig = plt.figure()
+
+    def _to_n(value, n, name):
+        if value is None:
+            return [None] * n
+        if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
+            return [value] * n
+        value = list(value)
+        if len(value) == 1:
+            return value * n
+        if len(value) != n:
+            raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
+        return value
 
     if np.isscalar(gap):
         gap = (gap, gap)
@@ -111,12 +135,54 @@ def subplot(nh, nw,
             p = [x, y, axw[iw], axh[ih]]
             pos.append(p)
 
-            if not skipaxes:
-                axes.append(fig.add_axes(p))
+            axes.append(fig.add_axes(p))
 
             x += axw[iw] + gap[1]
 
         y -= gap[0]
+
+    n_axes = len(axes)
+    xlog_list = _to_n(xlog, n_axes, 'xlog')
+    ylog_list = _to_n(ylog, n_axes, 'ylog')
+    xlim_list = _to_n(xlim, n_axes, 'xlim')
+    ylim_list = _to_n(ylim, n_axes, 'ylim')
+    grid_list = _to_n(grid, n_axes, 'grid')
+    ylabel_list = _to_n(ylabel, n_axes, 'ylabel')
+
+    if xlabel is None:
+        xlabel_list = [None] * n_axes
+    else:
+        if isinstance(xlabel, (list, tuple)) and not isinstance(xlabel, (str, bytes)):
+            xlabel_values = list(xlabel)
+            if len(xlabel_values) == nw:
+                xlabel_list = [None] * n_axes
+                for idx, ax in enumerate(axes):
+                    row = idx // nw
+                    col = idx % nw
+                    if row == nh - 1:
+                        xlabel_list[idx] = xlabel_values[col]
+            else:
+                xlabel_list = _to_n(xlabel, n_axes, 'xlabel')
+        else:
+            xlabel_list = [None] * n_axes
+            for idx in range(n_axes):
+                if idx // nw == nh - 1:
+                    xlabel_list[idx] = xlabel
+
+    for idx, ax in enumerate(axes):
+        if xlog_list[idx]:
+            ax.set_xscale('log')
+        if ylog_list[idx]:
+            ax.set_yscale('log')
+        if xlabel_list[idx] is not None:
+            ax.set_xlabel(xlabel_list[idx])
+        if ylabel_list[idx] is not None:
+            ax.set_ylabel(ylabel_list[idx])
+        if xlim_list[idx] is not None:
+            ax.set_xlim(xlim_list[idx])
+        if ylim_list[idx] is not None:
+            ax.set_ylim(ylim_list[idx])
+        ax.grid(bool(grid_list[idx]))
 
     return axes, fig, pos
 
@@ -128,7 +194,6 @@ def subplot_old(nh, nw,
                   weight_h=None,
                   weight_w=None,
                   fig=None,
-                  skipaxes=False,
                   **kwargs):
     """
     MATLAB-equivalent tight_subplot using absolute normalized gaps and margins.
@@ -149,9 +214,6 @@ def subplot_old(nh, nw,
         Relative column widths (length nw).
     fig : matplotlib.figure.Figure, optional
         Figure to use (created if None).
-    skipaxes : bool
-        If True, only return positions.
-
     Returns
     -------
     axes : list of Axes
@@ -210,8 +272,7 @@ def subplot_old(nh, nw,
             p = [x, y, axw[iw], axh[ih]]
             pos.append(p)
 
-            if not skipaxes:
-                axes.append(fig.add_axes(p))
+            axes.append(fig.add_axes(p))
 
             x += axw[iw] + gap[1]
 
@@ -1135,3 +1196,5 @@ def enable_popout(fig, key='p'):
     fig.canvas.mpl_connect('key_press_event', on_key)
 
 #%%
+
+from .legacy import enable_log_toggle_old, layout_old, subplot_old
