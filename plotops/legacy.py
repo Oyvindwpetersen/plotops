@@ -15,7 +15,6 @@ def subplot_old(
     weight_h=None,
     weight_w=None,
     fig=None,
-    skipaxes=False,
     **kwargs,
 ):
     if fig is None:
@@ -65,8 +64,7 @@ def subplot_old(
             p = [x, y, axw[iw], axh[ih]]
             pos.append(p)
 
-            if not skipaxes:
-                axes.append(fig.add_axes(p))
+            axes.append(fig.add_axes(p))
 
             x += axw[iw] + gap[1]
 
