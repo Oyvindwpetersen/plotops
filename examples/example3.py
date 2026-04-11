@@ -1,3 +1,4 @@
+#%% Imports
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -8,6 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 import plotops
 
 
+#%% Matrix Style Plot
 plt.close("all")
 
 x = np.linspace(0, 10, 100)

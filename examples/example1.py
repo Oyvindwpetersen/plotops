@@ -1,4 +1,4 @@
-#%%
+#%% Imports
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import plotops
 
-#%% Test plot row (single)
+#%% Single Row Plot
 
 plt.close('all')
 
@@ -29,7 +29,7 @@ fig_out = plotops.plot.plotxy(
 
 # plotops.print.savefig(fig_out['fig'], 'plot_example_1', '.', figsize=fig_layout['figsize'], formats=['pdf', 'png'])
 
-#%% Test plot row (multiple)
+#%% Multi Row Plot
 
 plt.close('all')
 
@@ -53,7 +53,7 @@ fig_out= plotops.plot.plotxy(
     layout_kwargs=fig_layout)
 
 plotops.print.savefig(fig_out['fig'],'plot_example_2','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
-#%% Test plot row (multiple, with restack)
+#%% Matrix Style Plot
 
 plt.close('all')
 
@@ -75,7 +75,7 @@ fig_out=  plotops.plot.plotxy(
 
 plotops.print.savefig(fig_out['fig'],'plot_example_3','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 
-#%% Test plot 3D
+#%% Plot3D Matrix Input
 
 plt.close('all')
 
@@ -117,7 +117,7 @@ fig_out=plotops.plot.plot3d([x,x,x2],[A,B,C],
 plotops.print.savefig(fig_out['fig'],'plot_example_4','.',figsize=fig_layout['figsize'],formats=['pdf' , 'png'])
 
 
-#%%
+#%% Correlation Matrix
 
 C=np.random.randn(6,6)
 C=C@C.T+np.eye(6)

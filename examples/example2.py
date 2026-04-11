@@ -5,7 +5,7 @@ Created on Mon Dec 22 21:32:25 2025
 @author: oyvinpet
 """
 
-#%%
+#%% Imports
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -16,7 +16,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import plotops
 
-#%%
+#%% Surface With Isolines
 
 plt.close('all')
 n1, n2 = 40, 50
