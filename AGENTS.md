@@ -69,8 +69,8 @@ axes, fig, _ = plotops.subplot(
     grid=True,
 )
 
-axes[0].plot(x, y1)
-axes[1].plot(x, y2)
+axes[0, 0].plot(x, y1)
+axes[1, 0].plot(x, y2)
 ```
 
 Use this pattern when:
@@ -193,7 +193,7 @@ axes, fig, pos = plotops.subplot(...)
 ```
 
 Where:
-- `axes` is a `list` of matplotlib axes handles
+- `axes` is a 2D NumPy object array of matplotlib axes handles with shape `(nrow, ncol)`
 - `fig` is a matplotlib figure handle
 - `pos` is a `list` of `[left, bottom, width, height]` normalized axis positions
 

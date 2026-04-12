@@ -31,7 +31,7 @@ Current runtime dependencies:
 Layout and figure control:
 
 - `layout()` computes figure size and normalized layout parameters
-- `subplot()` creates tightly controlled subplot grids and can apply labels, log scaling, limits, and grids
+- `subplot()` creates tightly controlled subplot grids as a 2D axes array and can apply labels, log scaling, limits, and grids
 - `axistight()` applies MATLAB-style axis padding
 - `size()` resizes and repositions the figure window
 - `tile()` tiles all open figures on screen
@@ -96,8 +96,8 @@ axes, fig, _ = plotops.subplot(
     ylog=False,
 )
 
-axes[0].plot(x, y1)
-axes[1].scatter(x, y2)
+axes[0, 0].plot(x, y1)
+axes[1, 0].scatter(x, y2)
 ```
 
 ## Examples

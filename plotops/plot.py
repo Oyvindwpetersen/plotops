@@ -190,7 +190,7 @@ def plotxy(
         fig_layout = layout_kwargs if layout_kwargs is not None else figure.layout(nrows, ncols)
                                       
         axes, fig, _ = figure.subplot(nrows, ncols, **(fig_layout or {}))
-        axes = np.atleast_1d(axes)
+        axes_flat = np.asarray(axes, dtype=object).reshape(-1)
 
         figs.append(fig)
         axes_all.append(axes)
@@ -199,7 +199,7 @@ def plotxy(
         per_fig_lines = []
 
         for local_i, global_i in enumerate(range(i0, i1)):
-            ax = axes[local_i]
+            ax = axes_flat[local_i]
             ax_lines = []
 
             for j in range(n_source):
@@ -240,7 +240,7 @@ def plotxy(
 
             per_fig_lines.append(ax_lines)
 
-        for idx, ax in enumerate(axes):
+        for idx, ax in enumerate(axes_flat):
             row = idx // ncols
             if row == nrows - 1:
                 ax.set_xlabel(xlabel)
