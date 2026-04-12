@@ -43,11 +43,14 @@ Layout and figure control:
 High-level plotting utilities:
 
 - `plotxy()` creates multi-source row-wise plots
+- `plot_timefreq()` creates 2-column time/FFT subplot grids
 - `plot3d()` flattens 3D matrix data into structured subplot layouts
 - `corr()` converts covariance matrices to correlation plots
 - `surfiso()` plots triangulated 3D surfaces with isolines
 
 `plotxy(..., return_all=True)` returns all generated figures, axes groups, and line groups when one call spans multiple figures.
+
+`plotxy()` accepts either one shared x-array per source or one x-array per subplot row, which allows wrappers such as `plot_timefreq()` to reuse the same legend and layout behavior.
 
 ### `plotops.legacy`
 
@@ -99,6 +102,24 @@ axes, fig, _ = plotops.subplot(
 axes[0, 0].plot(x, y1)
 axes[1, 0].scatter(x, y2)
 ```
+
+## Time And Frequency
+
+For repeated "time on the left, FFT on the right" plots, use `plot_timefreq()`:
+
+```python
+fig_layout = plotops.layout(2, 2)
+
+fig_out = plotops.plot_timefreq(
+    [t_a, t_b],
+    [y_a, y_b],
+    labels=["Case A", "Case B"],
+    ylabel=["Response 1", "Response 2"],
+    layout_kwargs=fig_layout,
+)
+```
+
+This keeps the same legend/layout behavior as `plotxy()` while internally building one time row and one positive-frequency FFT row per signal.
 
 ## Examples
 

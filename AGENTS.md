@@ -24,6 +24,7 @@ Preferred top-level functions:
 - `plotops.layout`
 - `plotops.subplot`
 - `plotops.multiplot`
+- `plotops.plot_timefreq`
 - `plotops.plot3d`
 - `plotops.savefig`
 
@@ -40,11 +41,13 @@ Avoid importing deep internals unless needed for a specific reason.
 2. Axes creation / plotting layer
    - `plotops.subplot(...)` creates axes using the layout
    - `plotops.multiplot(...)` creates standard row-wise multi-source plots directly
+   - `plotops.plot_timefreq(...)` creates standard 2-column time/FFT plots
    - `plotops.plot3d(...)` flattens 3D matrix-style data into a subplot grid
 
 This means:
 - if the code needs custom plotting logic, use `layout()` + `subplot()`
 - if the code matches the standard “same x-type data, several sources, one signal per subplot row” pattern, use `multiplot()`
+- if the code matches a standard time-domain plus FFT comparison pattern, prefer `plot_timefreq()`
 - if the input is matrix-style 3D data, prefer `plot3d()`
 
 ## Typical Use
