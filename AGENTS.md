@@ -108,7 +108,30 @@ fig_out = plotops.multiplot(
 
 Use this pattern by default for comparison plots.
 
-### Pattern C: matrix-style 3D data
+### Pattern C: time and frequency side-by-side
+
+Use this for the common case:
+- one time-domain subplot and one FFT subplot per signal
+- several data sources compared in each row
+- shared legend/layout behavior from `plotxy()`
+
+```python
+import plotops
+
+layout = plotops.layout(2, 2)
+
+fig_out = plotops.plot_timefreq(
+    t_list=[t_a, t_b],
+    y_list=[y_a, y_b],
+    labels=["Case A", "Case B"],
+    ylabel=["Response 1", "Response 2"],
+    layout_kwargs=layout,
+)
+```
+
+Use this pattern when the left column is time series and the right column is the corresponding positive-frequency FFT.
+
+### Pattern D: matrix-style 3D data
 
 Use `plotops.plot3d(...)` when data is shaped like:
 - `(nrow, ncol, npoints)`
@@ -137,7 +160,7 @@ layout = plotops.layout(nrow, ncol)
 
 Pass it forward as:
 - `layout=layout` to `plotops.subplot(...)`
-- `layout_kwargs=layout` to `plotops.multiplot(...)` or `plotops.plot3d(...)`
+- `layout_kwargs=layout` to `plotops.multiplot(...)`, `plotops.plot_timefreq(...)`, or `plotops.plot3d(...)`
 
 This is preferred over relying on default spacing when writing project code that should stay visually consistent.
 
@@ -149,6 +172,8 @@ If the plot is fundamentally:
 - one legend for several sources
 
 then prefer `plotops.multiplot()` over manual loops.
+
+`plotops.multiplot()` also supports one x-array per subplot row when a wrapper or caller needs different x-values in different rows.
 
 ### Prefer project-level labels and units
 
@@ -230,6 +255,14 @@ axes = fig_out["axes"]
 
 Treat `fig_out` as the standard returned object for high-level plotting.
 
+### `plotops.plot_timefreq(...)`
+
+Returns the same kind of output dict as `plotops.multiplot(...)`.
+
+Important additional keys:
+- `"time_lines"`: plotted time-domain line handles for the first figure
+- `"freq_lines"`: plotted FFT line handles for the first figure
+
 ### `plotops.plot3d(...)`
 
 Returns the same kind of output dict as `plotops.multiplot(...)`.
@@ -247,16 +280,20 @@ Does not return a plot object to build on. Treat it as an export function with s
 
 `x_list`:
 - one 1D array per source, or one shared 1D array reused for all sources
+- optionally one 1D array per subplot row for each source
 
 `y_list`:
 - one 2D array per source
 - shape is `(nsignal, npoints)`
+- optionally one 1D array per subplot row for each source
 
 Interpretation:
 - each row in each `y` array becomes one subplot
 - each source contributes one line in each subplot
 
 If a source has only one signal, a 1D array is acceptable and is promoted internally to shape `(1, npoints)`.
+
+If row-wise `x_list` and `y_list` are used, each x-row must match the length of its corresponding y-row.
 
 ### For `plot3d()`
 
@@ -274,10 +311,11 @@ When creating or updating plotting code in this repository:
 1. Prefer `plotops` over ad hoc matplotlib layout code.
 2. Prefer `plotops.layout()` for reproducible figure dimensions.
 3. Prefer `plotops.multiplot()` for standard comparison plots.
-4. Use `plotops.subplot()` when custom axes-by-axes plotting is needed.
-5. Use `plotops.savefig()` for final exported figures.
-6. Keep labels, units, and legend names explicit.
-7. Preserve returned handles (`fig`, `axes`, `fig_out`) when later code may need editing, annotations, or saving.
+4. Prefer `plotops.plot_timefreq()` for standard time-and-FFT comparison plots.
+5. Use `plotops.subplot()` when custom axes-by-axes plotting is needed.
+6. Use `plotops.savefig()` for final exported figures.
+7. Keep labels, units, and legend names explicit.
+8. Preserve returned handles (`fig`, `axes`, `fig_out`) when later code may need editing, annotations, or saving.
 
 ## When Not to Use `plotops`
 
