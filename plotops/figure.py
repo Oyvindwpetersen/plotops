@@ -53,7 +53,7 @@ def subplot(nh, nw,
 
     Returns
     -------
-    axes : list of Axes
+    axes : ndarray of Axes, shape (nh, nw)
     fig  : matplotlib.figure.Figure
     pos  : list of [left, bottom, width, height]
     '''
@@ -123,7 +123,7 @@ def subplot(nh, nw,
     axh = H * weight_h
     axw = W * weight_w
 
-    axes = []
+    axes_flat = []
     pos = []
 
     y = 1.0 - marg_h[1]
@@ -135,13 +135,13 @@ def subplot(nh, nw,
             p = [x, y, axw[iw], axh[ih]]
             pos.append(p)
 
-            axes.append(fig.add_axes(p))
+            axes_flat.append(fig.add_axes(p))
 
             x += axw[iw] + gap[1]
 
         y -= gap[0]
 
-    n_axes = len(axes)
+    n_axes = len(axes_flat)
     xlog_list = _to_n(xlog, n_axes, 'xlog')
     ylog_list = _to_n(ylog, n_axes, 'ylog')
     xlim_list = _to_n(xlim, n_axes, 'xlim')
@@ -156,7 +156,7 @@ def subplot(nh, nw,
             xlabel_values = list(xlabel)
             if len(xlabel_values) == nw:
                 xlabel_list = [None] * n_axes
-                for idx, ax in enumerate(axes):
+                for idx, ax in enumerate(axes_flat):
                     row = idx // nw
                     col = idx % nw
                     if row == nh - 1:
@@ -169,7 +169,7 @@ def subplot(nh, nw,
                 if idx // nw == nh - 1:
                     xlabel_list[idx] = xlabel
 
-    for idx, ax in enumerate(axes):
+    for idx, ax in enumerate(axes_flat):
         if xlog_list[idx]:
             ax.set_xscale('log')
         if ylog_list[idx]:
@@ -183,6 +183,8 @@ def subplot(nh, nw,
         if ylim_list[idx] is not None:
             ax.set_ylim(ylim_list[idx])
         ax.grid(bool(grid_list[idx]))
+
+    axes = np.asarray(axes_flat, dtype=object).reshape(nh, nw)
 
     return axes, fig, pos
 

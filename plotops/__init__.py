@@ -17,6 +17,7 @@ from . import legacy
 # Plotting
 from .plot import plotxy as multiplot   # or rename in plot.py directly
 from .plot import plot3d
+from .plot import plot_timefreq
 
 # Layout / figure tools
 from .figure import layout, subplot, axistight, size, tile
@@ -30,6 +31,7 @@ from .misc import color
 __all__ = [
     'multiplot',
     'plot3d',
+    'plot_timefreq',
     'layout',
     'subplot',
     'axistight',

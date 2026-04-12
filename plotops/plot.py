@@ -41,7 +41,9 @@ def plotxy(
     Parameters
     ----------
     x_list : array-like or list
-    y_list : array-like or list (2D per source)
+        One shared 1D x-array per source, or one x-array per subplot row.
+    y_list : array-like or list
+        One 1D/2D y-array per source, or one y-array per subplot row.
     labels : list of str, optional
     ncols : int, optional
     return_all : bool, optional
@@ -67,6 +69,53 @@ def plotxy(
             raise ValueError(f'{name} length ({len(x)}) must be 1 or {n}')
         return x
 
+    def _is_rowwise_x(x, nrow):
+        if isinstance(x, np.ndarray):
+            return x.ndim == 2 and x.shape[0] == nrow
+
+        if isinstance(x, (str, bytes)) or not isinstance(x, (list, tuple)):
+            return False
+
+        if len(x) != nrow:
+            return False
+
+        return any(not np.isscalar(xi) for xi in x)
+
+    def _is_rowwise_y(y):
+        if isinstance(y, np.ndarray):
+            return y.ndim == 2
+
+        if isinstance(y, (str, bytes)) or not isinstance(y, (list, tuple)):
+            return False
+
+        return any(not np.isscalar(yi) for yi in y)
+
+    def _normalize_y_source(y):
+        if _is_rowwise_y(y):
+            if isinstance(y, np.ndarray):
+                return [_to_1d(yi) for yi in y]
+            return [_to_1d(yi) for yi in list(y)]
+
+        return [_to_1d(y)]
+
+    def _normalize_x_source(x, y_rows, idx):
+        if _is_rowwise_x(x, len(y_rows)):
+            if isinstance(x, np.ndarray):
+                x_rows = [_to_1d(xi) for xi in x]
+            else:
+                x_rows = [_to_1d(xi) for xi in list(x)]
+        else:
+            x_shared = _to_1d(x)
+            x_rows = [x_shared] * len(y_rows)
+
+        for i, (xi, yi) in enumerate(zip(x_rows, y_rows)):
+            if yi.size != xi.size:
+                raise ValueError(
+                    f'idx {idx}, row {i}: x.size={xi.size}, y.size={yi.size}'
+                )
+
+        return x_rows
+
     # -------------------------------------------------
     # normalize inputs
     # -------------------------------------------------
@@ -74,13 +123,12 @@ def plotxy(
     if not isinstance(y_list, (list, tuple)):
         y_list = [y_list]
     
-    # Convert y first so shape is known
-    y_list = [_to_2d(y) for y in y_list]
-    n_source = len(y_list)
+    y_rows_list = [_normalize_y_source(y) for y in y_list]
+    n_source = len(y_rows_list)
     
     # Handle missing x_list
     if x_list is None or (isinstance(x_list, (list, tuple)) and len(x_list) == 0):
-        N = y_list[0].shape[1]
+        N = y_rows_list[0][0].size
         x_default = np.arange(1, N + 1)
         x_list = [x_default.copy() for _ in range(n_source)]
     
@@ -90,37 +138,50 @@ def plotxy(
     
     if len(x_list) == 1 and n_source > 1:
         x_list = x_list * n_source
-    
-    x_list = [_to_1d(x) for x in x_list]
-    
+
     if len(x_list) != n_source:
         raise ValueError(
             f'x_list length ({len(x_list)}) does not match '
             f'y_list length ({n_source})'
         )
 
-    n_signal = y_list[0].shape[0]
+    n_signal = len(y_rows_list[0])
+    x_rows_list = []
 
     rows = []
     errors = []
 
-    for j, (x, y) in enumerate(zip(x_list, y_list)):
-        rows.append((j, x.size, *y.shape))
+    for j, (x, y_rows) in enumerate(zip(x_list, y_rows_list)):
+        if len(y_rows) != n_signal:
+            errors.append(
+                f'y_list[{j}]: rows={len(y_rows)} (expected {n_signal})'
+            )
+            first_size = y_rows[0].size if len(y_rows) > 0 else 0
+            rows.append((j, '-', len(y_rows), first_size))
+            continue
 
-        if y.shape[0] != n_signal:
-            errors.append(
-                f'y_list[{j}]: rows={y.shape[0]} (expected {n_signal})'
-            )
-        if y.shape[1] != x.size:
-            errors.append(
-                f'idx {j}: x.size={x.size}, y.cols={y.shape[1]}'
-            )
+        try:
+            x_rows = _normalize_x_source(x, y_rows, j)
+        except ValueError as exc:
+            errors.append(str(exc))
+            x_rows = None
+
+        if x_rows is not None:
+            x_rows_list.append(x_rows)
+            x_size_info = x_rows[0].size if all(xi.size == x_rows[0].size for xi in x_rows) else 'var'
+            y_size_info = y_rows[0].size if all(yi.size == y_rows[0].size for yi in y_rows) else 'var'
+        else:
+            x_rows_list.append(None)
+            x_size_info = 'err'
+            y_size_info = 'err'
+
+        rows.append((j, x_size_info, len(y_rows), y_size_info))
 
     if errors:
-        header = ' idx (source) | x.size | y.rows | y.cols '
+        header = ' idx (source) | x.size | y.rows | y.size '
         sep = '-' * len(header)
         table = '\n'.join(
-            f'{j:4d} | {xs:6d} | {yr:6d} | {yc:6d}'
+            f'{j:4d} | {str(xs):>6s} | {yr:6d} | {str(yc):>6s}'
             for j, xs, yr, yc in rows
         )
 
@@ -188,8 +249,26 @@ def plotxy(
 
         # Avoid recomputing layout if provided
         fig_layout = layout_kwargs if layout_kwargs is not None else figure.layout(nrows, ncols)
-                                      
-        axes, fig, _ = figure.subplot(nrows, ncols, **(fig_layout or {}))
+        n_axes = nrows * ncols
+        n_active = i1 - i0
+        n_pad = n_axes - n_active
+
+        xlog_fig = _to_n(xlog, n_signal, 'xlog')[i0:i1] + [False] * n_pad
+        ylog_fig = _to_n(ylog, n_signal, 'ylog')[i0:i1] + [False] * n_pad
+        xlim_fig = _to_n(xlim, n_signal, 'xlim')[i0:i1] + [None] * n_pad
+        ylabel_fig = ylabel[i0:i1] + [None] * n_pad
+
+        axes, fig, _ = figure.subplot(
+            nrows,
+            ncols,
+            layout=fig_layout,
+            xlabel=xlabel,
+            ylabel=ylabel_fig,
+            xlog=xlog_fig,
+            ylog=ylog_fig,
+            xlim=xlim_fig,
+            grid=True,
+        )
         axes_flat = np.asarray(axes, dtype=object).reshape(-1)
 
         figs.append(fig)
@@ -203,9 +282,10 @@ def plotxy(
             ax_lines = []
 
             for j in range(n_source):
+                x_row = x_rows_list[j][global_i]
                 h, = ax.plot(
-                    x_list[j],
-                    y_list[j][global_i, :],
+                    x_row,
+                    y_rows_list[j][global_i],
                     color=color[j],
                     linestyle=linestyle[j],
                     linewidth=linewidth[j],
@@ -219,31 +299,18 @@ def plotxy(
                 if global_i == 0:
                     legend_handles.append(h)
 
-            if xlog:
-                ax.set_xscale('log')
-                
-            if ylog:
-                ax.set_yscale('log')
-
-            ax.set_ylabel(ylabel[global_i])
-            ax.grid(True)
-
-            if ylog:
+            if ylog_fig[local_i]:
                 figure.axistight(ax, p=(0, 0.05), axes=('x','ylog'))
             else:
                 figure.axistight(ax, p=(0, 0.05), axes=('x','y'))
-                
-            if xlim is not None: ax.set_xlim(xlim)
 
             if cursor:
                 mplcursors.cursor(ax, hover=False)
 
             per_fig_lines.append(ax_lines)
 
-        for idx, ax in enumerate(axes_flat):
-            row = idx // ncols
-            if row == nrows - 1:
-                ax.set_xlabel(xlabel)
+        for ax in axes_flat[n_active:]:
+            ax.set_visible(False)
 
         if suptitle != '':
             fig.suptitle(suptitle, fontweight='bold', fontsize=10)
@@ -315,6 +382,134 @@ def plotxy(
         fig_out['figs'] = figs
         fig_out['axes_all'] = axes_all
         fig_out['lines_all'] = lines_all
+
+    return fig_out
+
+
+def plot_timefreq(
+    t_list,
+    y_list,
+    *,
+    labels=None,
+    color=None,
+    linestyle=('-',),
+    linewidth=(1.2,),
+    marker=(None,),
+    alpha=(1.0,),
+    time_xlabel='t [s]',
+    freq_xlabel='f [Hz]',
+    ylabel=None,
+    fft_ylabel=None,
+    suptitle='',
+    ylog_freq=False,
+    time_xlim=None,
+    freq_xlim=None,
+    legend=True,
+    cursor=True,
+    layout_kwargs=None,
+    legend_kwargs=None,
+    **plot_kwargs
+):
+    """
+    Plot time series and one-sided FFT side-by-side for each signal row.
+
+    Parameters
+    ----------
+    t_list : array-like or list of array-like
+        Time vectors per source.
+    y_list : array-like or list of array-like
+        Signal matrices per source with shape (nsignal, npoints).
+        One time vector is used per source and converted internally to
+        row-wise time and frequency data before delegating to `plotxy()`.
+
+    Returns
+    -------
+    dict
+        Figure, axes, line handles, and metadata.
+    """
+
+    if not isinstance(y_list, (list, tuple)):
+        y_list = [y_list]
+
+    y_list = [_to_2d(y) for y in y_list]
+    n_source = len(y_list)
+
+    if not isinstance(t_list, (list, tuple)):
+        t_list = [t_list]
+    if len(t_list) == 1 and n_source > 1:
+        t_list = t_list * n_source
+
+    t_list = [_to_1d(t) for t in t_list]
+
+    if len(t_list) != n_source:
+        raise ValueError(
+            f't_list length ({len(t_list)}) does not match '
+            f'y_list length ({n_source})'
+        )
+
+    n_signal = y_list[0].shape[0]
+
+    if ylabel is None:
+        ylabel = [f'$y_{i+1}$' for i in range(n_signal)]
+    if isinstance(ylabel, str):
+        ylabel = [ylabel]
+
+    if fft_ylabel is None:
+        fft_ylabel = [f'|FFT({lab})|' for lab in ylabel]
+    if isinstance(fft_ylabel, str):
+        fft_ylabel = [fft_ylabel]
+
+    if color is None:
+        color = misc.color(n_source)
+
+    x_tf = []
+    y_tf = []
+
+    for t, y in zip(t_list, y_list):
+        x_rows = []
+        y_rows = []
+
+        for i in range(n_signal):
+            dt = np.mean(np.diff(t))
+            freq = np.fft.rfftfreq(t.size, d=dt)
+            amp = np.abs(np.fft.rfft(y[i, :]))
+
+            x_rows.extend([t, freq])
+            y_rows.extend([y[i, :], amp])
+
+        x_tf.append(x_rows)
+        y_tf.append(y_rows)
+
+    ylabel_tf = [val for pair in zip(ylabel, fft_ylabel) for val in pair]
+    ylog_tf = [val for pair in zip([False] * n_signal, [ylog_freq] * n_signal) for val in pair]
+    xlim_tf = [val for pair in zip([time_xlim] * n_signal, [freq_xlim] * n_signal) for val in pair]
+
+    fig_out = plotxy(
+        x_tf,
+        y_tf,
+        labels=labels,
+        color=color,
+        linestyle=linestyle,
+        linewidth=linewidth,
+        marker=marker,
+        alpha=alpha,
+        xlabel=[time_xlabel, freq_xlabel],
+        ylabel=ylabel_tf,
+        suptitle=suptitle,
+        ylog=ylog_tf,
+        xlim=xlim_tf,
+        legend=legend,
+        cursor=cursor,
+        ncols=2,
+        layout_kwargs=layout_kwargs if layout_kwargs is not None else figure.layout(n_signal, 2),
+        legend_kwargs=legend_kwargs,
+        **plot_kwargs
+    )
+
+    fig_out['time_lines'] = fig_out['lines'][0::2]
+    fig_out['freq_lines'] = fig_out['lines'][1::2]
+    fig_out['meta']['fft_ylabel'] = fft_ylabel
+    fig_out['meta']['ylog_freq'] = ylog_freq
 
     return fig_out
 
