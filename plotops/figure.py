@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import tkinter as tk
+import mplcursors
 from PyQt5 import QtCore   # or PyQt6 / PySide2 depending on backend
 import os
 
@@ -187,6 +188,235 @@ def subplot(nh, nw,
     axes = np.asarray(axes_flat, dtype=object).reshape(nh, nw)
 
     return axes, fig, pos
+
+
+def finish(
+    fig,
+    axes,
+    *,
+    legend=True,
+    legend_handles=None,
+    legend_labels=None,
+    legend_kwargs=None,
+    tight=True,
+    xlim=None,
+    ylog=False,
+    hide_unused=True,
+    n_active=None,
+    suptitle=None,
+    cursor=True,
+    interactive=True,
+):
+    """
+    Apply standard post-plot finishing for custom subplot workflows.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Target figure.
+    axes : array-like of Axes
+        Axes returned from `subplot(...)` or a compatible collection.
+    legend : bool
+        Add a figure-level legend gathered from the axes.
+    legend_handles, legend_labels : list, optional
+        Explicit legend content. If omitted, handles/labels are collected
+        from the axes and deduplicated by label.
+    legend_kwargs : dict, optional
+        Forwarded to `fig.legend(...)`.
+    tight : bool
+        Apply `axistight(...)` / visible-range y-tightening to active axes.
+    xlim : tuple | list of tuple | None
+        Optional fixed x-limits per active axis. If provided, visible-range
+        y-limits are recomputed from the plotted line data.
+    ylog : bool | list of bool
+        Log-scale flags for y-axis handling during tightening.
+    hide_unused : bool
+        Hide padded axes after `n_active`.
+    n_active : int, optional
+        Number of active axes. Defaults to all axes.
+    suptitle : str, optional
+        Figure super-title.
+    cursor : bool
+        Enable `mplcursors` on active axes.
+    interactive : bool
+        Enable figure window sizing and keyboard helpers.
+
+    Returns
+    -------
+    dict
+        Metadata and created artists.
+    """
+
+    axes_arr = np.asarray(axes, dtype=object)
+    axes_flat = axes_arr.reshape(-1).tolist()
+
+    if len(axes_flat) == 0:
+        raise ValueError('axes must contain at least one axis')
+
+    if n_active is None:
+        n_active = len(axes_flat)
+
+    n_active = int(n_active)
+    if n_active < 0 or n_active > len(axes_flat):
+        raise ValueError('n_active must be between 0 and number of axes')
+
+    active_axes = axes_flat[:n_active]
+    inactive_axes = axes_flat[n_active:]
+
+    def _to_n(value, n, name):
+        if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
+            return [value] * n
+        value = list(value)
+        if len(value) == 1:
+            return value * n
+        if len(value) != n:
+            raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
+        return value
+
+    def _set_visible_y_limits(ax, frac, ylog_axis=False):
+        xlim_current = ax.get_xlim()
+        xlo, xhi = sorted(xlim_current)
+        ymins = []
+        ymaxs = []
+
+        for line in ax.lines:
+            if not line.get_visible():
+                continue
+
+            xdata = np.asarray(line.get_xdata(orig=False))
+            ydata = np.asarray(line.get_ydata(orig=False))
+
+            if xdata.size == 0 or ydata.size == 0:
+                continue
+
+            mask = np.isfinite(xdata) & np.isfinite(ydata)
+            mask &= (xdata >= xlo) & (xdata <= xhi)
+
+            if ylog_axis:
+                mask &= ydata > 0
+
+            if not np.any(mask):
+                continue
+
+            y_visible = ydata[mask]
+            ymins.append(np.min(y_visible))
+            ymaxs.append(np.max(y_visible))
+
+        if not ymins:
+            return
+
+        ymin = min(ymins)
+        ymax = max(ymaxs)
+
+        if ymin == ymax:
+            delta = 0.05 * abs(ymin) if ymin != 0 else 1.0
+            ymin -= delta
+            ymax += delta
+            if ylog_axis and ymin <= 0:
+                ymin = min(y for y in [min(ymins), ymax / 10] if y > 0)
+
+        ylim = _expand_limits((ymin, ymax), 0.05, log=ylog_axis)
+        ax.set_ylim(ylim)
+
+    def _collect_legend_entries(ax_list):
+        collected = []
+        seen = set()
+
+        for ax in ax_list:
+            handles_i, labels_i = ax.get_legend_handles_labels()
+            for h, label in zip(handles_i, labels_i):
+                if not label or label.startswith('_'):
+                    continue
+                if label in seen:
+                    continue
+                seen.add(label)
+                collected.append((h, label))
+
+        return collected
+
+    def _rowwise_order(n_items, ncol):
+        nrow = int(np.ceil(n_items / ncol))
+        order = []
+        for c in range(ncol):
+            for r in range(nrow):
+                idx = r * ncol + c
+                if idx < n_items:
+                    order.append(idx)
+        return order
+
+    ylog_list = _to_n(ylog, n_active, 'ylog')
+    xlim_list = _to_n(xlim, n_active, 'xlim') if n_active > 0 else []
+
+    if tight:
+        for i, ax in enumerate(active_axes):
+            if xlim_list[i] is None:
+                axes_to_tighten = ('x', 'ylog') if ylog_list[i] else ('x', 'y')
+                axistight(ax, p=(0, 0.05), axes=axes_to_tighten)
+            else:
+                ax.set_xlim(xlim_list[i])
+                _set_visible_y_limits(ax, 0.05, ylog_axis=ylog_list[i])
+
+    if cursor:
+        for ax in active_axes:
+            mplcursors.cursor(ax, hover=False)
+
+    if hide_unused:
+        for ax in inactive_axes:
+            ax.set_visible(False)
+
+    if suptitle not in (None, ''):
+        fig.suptitle(suptitle, fontweight='bold', fontsize=10)
+
+    legend_artist = None
+    if legend and n_active > 0:
+        legend_kwargs = dict(legend_kwargs or {})
+
+        if legend_handles is None or legend_labels is None:
+            entries = _collect_legend_entries(active_axes)
+            if legend_handles is None:
+                legend_handles = [h for h, _ in entries]
+            if legend_labels is None:
+                legend_labels = [label for _, label in entries]
+
+        if len(legend_handles) != len(legend_labels):
+            raise ValueError('legend_handles and legend_labels must have same length')
+
+        if len(legend_handles) > 0:
+            ncol = legend_kwargs.pop('ncol', min(len(legend_handles), 5))
+            order = _rowwise_order(len(legend_handles), ncol)
+            legend_handles = [legend_handles[i] for i in order]
+            legend_labels = [legend_labels[i] for i in order]
+
+            right_edge = max(ax.get_position().x1 for ax in active_axes)
+            top_edge = max(ax.get_position().y1 for ax in active_axes)
+            vertical_gap = legend_kwargs.pop('vertical_gap', 0.02)
+
+            legend_artist = fig.legend(
+                legend_handles,
+                legend_labels,
+                loc='lower right',
+                bbox_to_anchor=(right_edge, top_edge + vertical_gap),
+                bbox_transform=fig.transFigure,
+                ncol=ncol,
+                columnspacing=1.0,
+                handlelength=1.5,
+                handletextpad=0.5,
+                borderaxespad=0,
+                frameon=True,
+                **legend_kwargs
+            )
+
+    if interactive:
+        size(fig)
+        log_toggle(fig, key='l')
+        enable_popout(fig, key='p')
+
+    return {
+        'fig': fig,
+        'axes': axes_arr,
+        'active_axes': active_axes,
+        'legend': legend_artist,
+    }
 
 
 def subplot_old(nh, nw,

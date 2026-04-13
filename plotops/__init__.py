@@ -20,7 +20,7 @@ from .plot import plot3d
 from .plot import plot_timefreq
 
 # Layout / figure tools
-from .figure import layout, subplot, axistight, size, tile
+from .figure import layout, subplot, finish, axistight, size, tile
 
 # Saving / printing
 from .print import savefig
@@ -34,6 +34,7 @@ __all__ = [
     'plot_timefreq',
     'layout',
     'subplot',
+    'finish',
     'axistight',
     'size',
     'tile',
