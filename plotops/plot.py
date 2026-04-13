@@ -116,6 +116,51 @@ def plotxy(
 
         return x_rows
 
+    def _set_visible_y_limits(ax, frac, ylog_axis=False):
+        xlim_current = ax.get_xlim()
+        xlo, xhi = sorted(xlim_current)
+        ymins = []
+        ymaxs = []
+
+        for line in ax.lines:
+            if not line.get_visible():
+                continue
+
+            xdata = np.asarray(line.get_xdata(orig=False))
+            ydata = np.asarray(line.get_ydata(orig=False))
+
+            if xdata.size == 0 or ydata.size == 0:
+                continue
+
+            mask = np.isfinite(xdata) & np.isfinite(ydata)
+            mask &= (xdata >= xlo) & (xdata <= xhi)
+
+            if ylog_axis:
+                mask &= ydata > 0
+
+            if not np.any(mask):
+                continue
+
+            y_visible = ydata[mask]
+            ymins.append(np.min(y_visible))
+            ymaxs.append(np.max(y_visible))
+
+        if not ymins:
+            return
+
+        ymin = min(ymins)
+        ymax = max(ymaxs)
+
+        if ymin == ymax:
+            delta = 0.05 * abs(ymin) if ymin != 0 else 1.0
+            ymin -= delta
+            ymax += delta
+            if ylog_axis and ymin <= 0:
+                ymin = min(y for y in [min(ymins), ymax / 10] if y > 0)
+
+        ylim = figure._expand_limits((ymin, ymax), frac, log=ylog_axis)
+        ax.set_ylim(ylim)
+
     # -------------------------------------------------
     # normalize inputs
     # -------------------------------------------------
@@ -299,10 +344,12 @@ def plotxy(
                 if global_i == 0:
                     legend_handles.append(h)
 
-            if ylog_fig[local_i]:
-                figure.axistight(ax, p=(0, 0.05), axes=('x','ylog'))
+            if xlim_fig[local_i] is None:
+                axes_to_tighten = ('x', 'ylog') if ylog_fig[local_i] else ('x', 'y')
+                figure.axistight(ax, p=(0, 0.05), axes=axes_to_tighten)
             else:
-                figure.axistight(ax, p=(0, 0.05), axes=('x','y'))
+                ax.set_xlim(xlim_fig[local_i])
+                _set_visible_y_limits(ax, 0.05, ylog_axis=ylog_fig[local_i])
 
             if cursor:
                 mplcursors.cursor(ax, hover=False)
