@@ -336,9 +336,10 @@ When creating or updating plotting code in this repository:
 3. Prefer `plotops.multiplot()` for standard comparison plots.
 4. Prefer `plotops.plot_timefreq()` for standard time-and-FFT comparison plots.
 5. Use `plotops.subplot()` when custom axes-by-axes plotting is needed.
-6. Use `plotops.savefig()` for final exported figures.
-7. Keep labels, units, and legend names explicit.
-8. Preserve returned handles (`fig`, `axes`, `fig_out`) when later code may need editing, annotations, or saving.
+6. After custom plotting with `plotops.subplot()`, prefer `plotops.finish()` for legend placement, axis tightening, hiding unused axes, and interactive helpers.
+7. Use `plotops.savefig()` for final exported figures.
+8. Keep labels, units, and legend names explicit.
+9. Preserve returned handles (`fig`, `axes`, `fig_out`) when later code may need editing, annotations, or saving.
 
 ## When Not to Use `plotops`
 
@@ -389,8 +390,15 @@ axes, fig, _ = plotops.subplot(
     ylabel=ylabel,
     xlog=xlog,
     ylog=ylog,
-    suptitle=suptitle,
     grid=grid,
+)
+
+# custom plotting on `axes`
+
+plotops.finish(
+    fig,
+    axes,
+    suptitle=suptitle,
 )
 ```
 
