@@ -31,7 +31,7 @@ Current runtime dependencies:
 Layout and figure control:
 
 - `layout()` computes figure size and normalized layout parameters
-- `subplot()` creates tightly controlled subplot grids as a 2D axes array and can apply labels, log scaling, limits, and grids
+- `subplot()` creates tightly controlled subplot grids as a 2D axes array and can apply labels, log scaling, limits, and grids; `ylabel` may be a single string, one label per row, or one label per axis in row-major order
 - `finish()` applies standard post-plot finishing for custom subplot workflows
 - `axistight()` applies MATLAB-style axis padding
 - `size()` resizes and repositions the figure window
@@ -114,6 +114,14 @@ plotops.finish(
 ```
 
 `plotops.finish()` is the recommended way to give custom subplot-based figures the same kind of post-plot behavior that high-level helpers already provide automatically, including axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive figure helpers.
+
+For `plotops.subplot(...)`, `ylabel` supports three explicit forms:
+
+- a single string to apply to every axis
+- a list of length `nrow` to apply one y-label per subplot row across all columns
+- a list of length `nrow * ncol` to apply one y-label per axis in row-major order
+
+For example, `ylabel=["MSD", ""]` on a `2 x 1` or `2 x 2` subplot grid labels the first row as `MSD` and leaves the second row unlabeled.
 
 ## Time And Frequency
 

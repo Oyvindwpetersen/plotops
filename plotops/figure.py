@@ -8,6 +8,77 @@ import mplcursors
 from PyQt5 import QtCore   # or PyQt6 / PySide2 depending on backend
 import os
 
+
+def _is_limit_pair(value):
+    if isinstance(value, (str, bytes)) or value is None:
+        return False
+
+    if isinstance(value, np.ndarray):
+        if value.ndim != 1 or value.size != 2:
+            return False
+        return all(np.isscalar(v) for v in value.tolist())
+
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return False
+
+    return all(np.isscalar(v) for v in value)
+
+
+def _to_n_with_limit_pair(value, n, name, *, allow_none=False):
+    if value is None and allow_none:
+        return [None] * n
+
+    if _is_limit_pair(value):
+        return [tuple(value)] * n
+
+    if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple, np.ndarray)):
+        return [value] * n
+
+    value = list(value)
+    if len(value) == 1:
+        return value * n
+    if len(value) != n:
+        raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
+    return value
+
+
+def _to_n(value, n, name, *, allow_none=False):
+    if value is None and allow_none:
+        return [None] * n
+
+    if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple, np.ndarray)):
+        return [value] * n
+
+    value = list(value)
+    if len(value) == 1:
+        return value * n
+    if len(value) != n:
+        raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
+    return value
+
+
+def _normalize_subplot_ylabels(ylabel, nh, nw):
+    n_axes = nh * nw
+
+    if ylabel is None:
+        return [None] * n_axes
+
+    if isinstance(ylabel, (str, bytes)) or not isinstance(ylabel, (list, tuple, np.ndarray)):
+        return [ylabel] * n_axes
+
+    ylabel = list(ylabel)
+    if len(ylabel) == 1:
+        return ylabel * n_axes
+    if len(ylabel) == nh:
+        return [ylabel[ih] for ih in range(nh) for _ in range(nw)]
+    if len(ylabel) == n_axes:
+        return ylabel
+
+    raise ValueError(
+        f'ylabel length ({len(ylabel)}) must be 1, {nh} (number of rows), '
+        f'or {n_axes} (number of axes)'
+    )
+
 #%%
 
 def subplot(nh, nw,
@@ -44,7 +115,8 @@ def subplot(nh, nw,
 
     xlabel, ylabel : str | list of str | None
         Axis labels to apply after subplot creation. `xlabel` is applied to the
-        bottom row axes, while `ylabel` is applied axis-by-axis in row-major order.
+        bottom row axes. `ylabel` supports scalar broadcast, one label per row,
+        or one label per axis in row-major order.
     xlog, ylog : bool | list of bool
         Log scaling flags. Scalars are broadcast to all axes.
     xlim, ylim : tuple | list of tuple | None
@@ -84,18 +156,6 @@ def subplot(nh, nw,
 
     if fig is None:
         fig = plt.figure()
-
-    def _to_n(value, n, name):
-        if value is None:
-            return [None] * n
-        if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
-            return [value] * n
-        value = list(value)
-        if len(value) == 1:
-            return value * n
-        if len(value) != n:
-            raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
-        return value
 
     if np.isscalar(gap):
         gap = (gap, gap)
@@ -145,10 +205,10 @@ def subplot(nh, nw,
     n_axes = len(axes_flat)
     xlog_list = _to_n(xlog, n_axes, 'xlog')
     ylog_list = _to_n(ylog, n_axes, 'ylog')
-    xlim_list = _to_n(xlim, n_axes, 'xlim')
-    ylim_list = _to_n(ylim, n_axes, 'ylim')
+    xlim_list = _to_n_with_limit_pair(xlim, n_axes, 'xlim', allow_none=True)
+    ylim_list = _to_n_with_limit_pair(ylim, n_axes, 'ylim', allow_none=True)
     grid_list = _to_n(grid, n_axes, 'grid')
-    ylabel_list = _to_n(ylabel, n_axes, 'ylabel')
+    ylabel_list = _normalize_subplot_ylabels(ylabel, nh, nw)
 
     if xlabel is None:
         xlabel_list = [None] * n_axes
@@ -264,14 +324,7 @@ def finish(
     inactive_axes = axes_flat[n_active:]
 
     def _to_n(value, n, name):
-        if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
-            return [value] * n
-        value = list(value)
-        if len(value) == 1:
-            return value * n
-        if len(value) != n:
-            raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
-        return value
+        return _to_n_with_limit_pair(value, n, name)
 
     def _set_visible_y_limits(ax, frac, ylog_axis=False):
         xlim_current = ax.get_xlim()
@@ -345,7 +398,7 @@ def finish(
         return order
 
     ylog_list = _to_n(ylog, n_active, 'ylog')
-    xlim_list = _to_n(xlim, n_active, 'xlim') if n_active > 0 else []
+    xlim_list = _to_n_with_limit_pair(xlim, n_active, 'xlim') if n_active > 0 else []
 
     if tight:
         for i, ax in enumerate(active_axes):

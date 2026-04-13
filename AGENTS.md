@@ -90,6 +90,13 @@ Use this pattern when:
 
 Pass shared axis settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, and `grid` directly into `plotops.subplot(...)` when available, instead of setting them afterwards axis by axis. Then call `plotops.finish(...)` after custom plotting to apply the standard post-plot behavior that `plotxy()` would otherwise handle automatically, such as axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive helpers.
 
+For `plotops.subplot(...)`, treat `ylabel` as supporting exactly these shapes:
+- a single string for all axes
+- a list of length `nrow` for one y-label per row across all columns
+- a list of length `nrow * ncol` for one y-label per axis in row-major order
+
+Example: on a 2-row subplot grid, `ylabel=["MSD", ""]` labels the first row and leaves the second row unlabeled.
+
 ### Pattern B: standard multi-source line plots
 
 Use this for the common case:
@@ -233,6 +240,11 @@ Where:
 - `axes` is a 2D NumPy object array of matplotlib axes handles with shape `(nrow, ncol)`
 - `fig` is a matplotlib figure handle
 - `pos` is a `list` of `[left, bottom, width, height]` normalized axis positions
+
+`ylabel` may be passed as:
+- one string for all axes
+- one string per row
+- one string per axis in row-major order
 
 Use this when you need direct access to axes handles.
 
