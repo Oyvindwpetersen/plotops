@@ -68,12 +68,12 @@ axes, fig, _ = plotops.subplot(
     ylabel=["Signal 1", "Signal 2"],
     ylog=False,
     xlog=False,
-    suptitle="Main title",
     grid=True,
 )
 
 axes[0, 0].plot(x, y1)
 axes[1, 0].plot(x, y2)
+fig.suptitle("Main title")
 ```
 
 Use this pattern when:
@@ -81,7 +81,7 @@ Use this pattern when:
 - you need annotations, mixed plot types, or special axis handling
 - you are building figures manually
 
-Pass shared axis/figure settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, `suptitle`, and `grid` directly into `plotops.subplot(...)` when available, instead of setting them afterwards axis by axis.
+Pass shared axis settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, and `grid` directly into `plotops.subplot(...)` when available, instead of setting them afterwards axis by axis. Apply figure-level titles on the returned `fig`, for example with `fig.suptitle(...)`.
 
 ### Pattern B: standard multi-source line plots
 
@@ -102,11 +102,12 @@ fig_out = plotops.multiplot(
     labels=["Case A", "Case B"],
     xlabel="t [s]",
     ylabel=["Response 1", "Response 2"],
+    suptitle="Main title",
     layout_kwargs=layout,
 )
 ```
 
-Use this pattern by default for comparison plots.
+Use this pattern by default for comparison plots. `plotops.multiplot(...)` forwards `suptitle` to the underlying `plotxy()` implementation.
 
 ### Pattern C: time and frequency side-by-side
 

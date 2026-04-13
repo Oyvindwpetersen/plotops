@@ -42,7 +42,7 @@ Layout and figure control:
 
 High-level plotting utilities:
 
-- `plotxy()` creates multi-source row-wise plots
+- `plotxy()` creates multi-source row-wise plots and accepts `suptitle=...`
 - `plot_timefreq()` creates 2-column time/FFT subplot grids
 - `plot3d()` flattens 3D matrix data into structured subplot layouts
 - `corr()` converts covariance matrices to correlation plots
@@ -51,6 +51,8 @@ High-level plotting utilities:
 `plotxy(..., return_all=True)` returns all generated figures, axes groups, and line groups when one call spans multiple figures.
 
 `plotxy()` accepts either one shared x-array per source or one x-array per subplot row, which allows wrappers such as `plot_timefreq()` to reuse the same legend and layout behavior.
+
+The top-level alias `plotops.multiplot(...)` points to `plotxy()`, so it also supports `suptitle=...`.
 
 ### `plotops.legacy`
 
@@ -73,6 +75,7 @@ fig_out = plotops.plot.plotxy(
     [x1, x2],
     [y1, y2],
     labels=["Case A", "Case B"],
+    suptitle="Main title",
     layout_kwargs=fig_layout,
 )
 
