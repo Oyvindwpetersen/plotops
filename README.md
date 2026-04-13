@@ -32,6 +32,7 @@ Layout and figure control:
 
 - `layout()` computes figure size and normalized layout parameters
 - `subplot()` creates tightly controlled subplot grids as a 2D axes array and can apply labels, log scaling, limits, and grids
+- `finish()` applies standard post-plot finishing for custom subplot workflows
 - `axistight()` applies MATLAB-style axis padding
 - `size()` resizes and repositions the figure window
 - `tile()` tiles all open figures on screen
@@ -104,7 +105,15 @@ axes, fig, _ = plotops.subplot(
 
 axes[0, 0].plot(x, y1)
 axes[1, 0].scatter(x, y2)
+
+plotops.finish(
+    fig,
+    axes,
+    suptitle="Main title",
+)
 ```
+
+`plotops.finish()` is the recommended way to give custom subplot-based figures the same kind of post-plot behavior that high-level helpers already provide automatically, including axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive figure helpers.
 
 ## Time And Frequency
 

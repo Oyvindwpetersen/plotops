@@ -23,6 +23,7 @@ import plotops
 Preferred top-level functions:
 - `plotops.layout`
 - `plotops.subplot`
+- `plotops.finish`
 - `plotops.multiplot`
 - `plotops.plot_timefreq`
 - `plotops.plot3d`
@@ -40,12 +41,13 @@ Avoid importing deep internals unless needed for a specific reason.
 
 2. Axes creation / plotting layer
    - `plotops.subplot(...)` creates axes using the layout
+   - `plotops.finish(...)` applies standard post-plot finishing for custom subplot workflows
    - `plotops.multiplot(...)` creates standard row-wise multi-source plots directly
    - `plotops.plot_timefreq(...)` creates standard 2-column time/FFT plots
    - `plotops.plot3d(...)` flattens 3D matrix-style data into a subplot grid
 
 This means:
-- if the code needs custom plotting logic, use `layout()` + `subplot()`
+- if the code needs custom plotting logic, use `layout()` + `subplot()` + `finish()`
 - if the code matches the standard “same x-type data, several sources, one signal per subplot row” pattern, use `multiplot()`
 - if the code matches a standard time-domain plus FFT comparison pattern, prefer `plot_timefreq()`
 - if the input is matrix-style 3D data, prefer `plot3d()`
@@ -73,7 +75,12 @@ axes, fig, _ = plotops.subplot(
 
 axes[0, 0].plot(x, y1)
 axes[1, 0].plot(x, y2)
-fig.suptitle("Main title")
+
+plotops.finish(
+    fig,
+    axes,
+    suptitle="Main title",
+)
 ```
 
 Use this pattern when:
@@ -81,7 +88,7 @@ Use this pattern when:
 - you need annotations, mixed plot types, or special axis handling
 - you are building figures manually
 
-Pass shared axis settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, and `grid` directly into `plotops.subplot(...)` when available, instead of setting them afterwards axis by axis. Apply figure-level titles on the returned `fig`, for example with `fig.suptitle(...)`.
+Pass shared axis settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, and `grid` directly into `plotops.subplot(...)` when available, instead of setting them afterwards axis by axis. Then call `plotops.finish(...)` after custom plotting to apply the standard post-plot behavior that `plotxy()` would otherwise handle automatically, such as axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive helpers.
 
 ### Pattern B: standard multi-source line plots
 
@@ -228,6 +235,18 @@ Where:
 - `pos` is a `list` of `[left, bottom, width, height]` normalized axis positions
 
 Use this when you need direct access to axes handles.
+
+### `plotops.finish(...)`
+
+Returns a `dict`.
+
+Important keys:
+- `"fig"`: the matplotlib figure handle
+- `"axes"`: the input axes as a NumPy object array
+- `"active_axes"`: flattened list of active axes used for finishing
+- `"legend"`: the created figure-level legend artist, or `None`
+
+Use this after `plotops.subplot(...)` and custom plotting when you want standard finishing behavior without switching to `plotops.multiplot(...)`.
 
 ### `plotops.multiplot(...)`
 
