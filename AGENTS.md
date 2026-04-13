@@ -126,11 +126,12 @@ fig_out = plotops.plot_timefreq(
     y_list=[y_a, y_b],
     labels=["Case A", "Case B"],
     ylabel=["Response 1", "Response 2"],
+    suptitle="Main title",
     layout_kwargs=layout,
 )
 ```
 
-Use this pattern when the left column is time series and the right column is the corresponding positive-frequency FFT.
+Use this pattern when the left column is time series and the right column is the corresponding positive-frequency FFT. `plotops.plot_timefreq(...)` supports the same common plotting options as `plotxy()` and `multiplot()`, including `suptitle`, while also adding time/frequency-specific arguments such as `time_xlabel`, `freq_xlabel`, `fft_ylabel`, `time_xlim`, `freq_xlim`, and `ylog_freq`.
 
 ### Pattern D: matrix-style 3D data
 
@@ -259,6 +260,8 @@ Treat `fig_out` as the standard returned object for high-level plotting.
 ### `plotops.plot_timefreq(...)`
 
 Returns the same kind of output dict as `plotops.multiplot(...)`.
+
+It also accepts the same common plotting options as `plotops.multiplot(...)` / `plotxy(...)`, including `labels`, `color`, `linestyle`, `linewidth`, `legend`, `layout_kwargs`, and `suptitle`, plus time/frequency-specific options.
 
 Important additional keys:
 - `"time_lines"`: plotted time-domain line handles for the first figure

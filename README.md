@@ -43,7 +43,7 @@ Layout and figure control:
 High-level plotting utilities:
 
 - `plotxy()` creates multi-source row-wise plots and accepts `suptitle=...`
-- `plot_timefreq()` creates 2-column time/FFT subplot grids
+- `plot_timefreq()` creates 2-column time/FFT subplot grids and supports the same common plotting arguments as `plotxy()` such as `suptitle=...`, plus time/FFT-specific options
 - `plot3d()` flattens 3D matrix data into structured subplot layouts
 - `corr()` converts covariance matrices to correlation plots
 - `surfiso()` plots triangulated 3D surfaces with isolines
@@ -118,11 +118,12 @@ fig_out = plotops.plot_timefreq(
     [y_a, y_b],
     labels=["Case A", "Case B"],
     ylabel=["Response 1", "Response 2"],
+    suptitle="Main title",
     layout_kwargs=fig_layout,
 )
 ```
 
-This keeps the same legend/layout behavior as `plotxy()` while internally building one time row and one positive-frequency FFT row per signal.
+This keeps the same legend/layout behavior as `plotxy()` while internally building one time row and one positive-frequency FFT row per signal. In practice, `plot_timefreq()` supports the common `plotxy()` options such as `labels`, `color`, `linestyle`, `linewidth`, `legend`, `layout_kwargs`, and `suptitle`, and adds time/frequency-specific arguments such as `time_xlabel`, `freq_xlabel`, `fft_ylabel`, `time_xlim`, `freq_xlim`, and `ylog_freq`.
 
 ## Examples
 
