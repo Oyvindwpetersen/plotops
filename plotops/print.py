@@ -39,7 +39,7 @@ def savefig(
     label_size=10,
     title_size=12,
     legend_size=9,
-    legend_loc='best',
+    legend_loc=None,
     fontname='Arial',
     dpi=1200,
     renderer=None,
@@ -71,8 +71,9 @@ def savefig(
         Font size for titles.
     legend_size : float
         Font size for legend.
-    legend_loc : str or int
-        Legend location (matplotlib convention).
+    legend_loc : str or int or None
+        Optional legend location override (matplotlib convention).
+        If None, keep the legend's existing placement.
     fontname : str
         Font family name (default: Arial).
     dpi : int
@@ -111,6 +112,25 @@ def savefig(
     fig.set_size_inches(figsize[1] * cm, figsize[0] * cm, forward=True)
 
     # --- update text properties ---
+    def _style_legend(leg):
+        if leg is None:
+            return
+
+        leg.set_title(leg.get_title().get_text())
+        leg.set_frame_on(True)
+
+        if legend_loc is not None:
+            leg.set_bbox_to_anchor(None)
+            try:
+                leg.set_loc(legend_loc)
+            except Exception:
+                leg._loc = legend_loc  # fallback for older matplotlib
+
+        for txt in leg.get_texts():
+            txt.set_fontsize(legend_size)
+            txt.set_fontname(fontname)
+
+    axis_legends = []
     for ax in fig.axes:
         ax.title.set_fontsize(title_size)
         ax.title.set_fontname(fontname)
@@ -126,16 +146,18 @@ def savefig(
 
         leg = ax.get_legend()
         if leg is not None:
-            leg.set_title(leg.get_title().get_text())
-            leg.set_frame_on(True)
-            leg.set_bbox_to_anchor(None)
-            try:
-                leg.set_loc(legend_loc)
-            except Exception:
-                leg._loc = legend_loc  # fallback for older matplotlib
-            for txt in leg.get_texts():
-                txt.set_fontsize(legend_size)
-                txt.set_fontname(fontname)
+            axis_legends.append(leg)
+            _style_legend(leg)
+
+    fig_legends = list(getattr(fig, 'legends', []))
+    for leg in fig_legends:
+        _style_legend(leg)
+
+    if axis_legends and fig_legends:
+        print(
+            'Warning: figure contains both axis-level and figure-level legends. '
+            'savefig() styled both; verify the exported legend layout.'
+        )
 
     # --- panel labels only for export ---
     panel_artists = []
