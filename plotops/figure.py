@@ -7,39 +7,64 @@ import tkinter as tk
 import mplcursors
 from PyQt5 import QtCore   # or PyQt6 / PySide2 depending on backend
 import os
+from numbers import Real
 
 
-def _is_limit_pair(value):
+def _is_numeric_limit_pair(value):
     if isinstance(value, (str, bytes)) or value is None:
         return False
 
     if isinstance(value, np.ndarray):
         if value.ndim != 1 or value.size != 2:
             return False
-        return all(np.isscalar(v) for v in value.tolist())
+        value = value.tolist()
 
     if not isinstance(value, (list, tuple)) or len(value) != 2:
         return False
 
-    return all(np.isscalar(v) for v in value)
+    return all(isinstance(v, Real) and not isinstance(v, (bool, np.bool_)) for v in value)
 
 
 def _to_n_with_limit_pair(value, n, name, *, allow_none=False):
-    if value is None and allow_none:
+    if value is None:
         return [None] * n
 
-    if _is_limit_pair(value):
+    if _is_numeric_limit_pair(value):
         return [tuple(value)] * n
 
     if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple, np.ndarray)):
-        return [value] * n
+        raise ValueError(
+            f'{name} must be None, a numeric (min, max) pair, a one-element '
+            f'sequence containing a pair, or a sequence of {n} pairs'
+        )
 
     value = list(value)
     if len(value) == 1:
-        return value * n
+        if value[0] is None and allow_none:
+            return [None] * n
+        if not _is_numeric_limit_pair(value[0]):
+            raise ValueError(
+                f'{name} one-element sequence must contain a numeric (min, max) pair'
+            )
+        return [tuple(value[0])] * n
     if len(value) != n:
-        raise ValueError(f'{name} length ({len(value)}) must be 1 or {n}')
-    return value
+        raise ValueError(
+            f'{name} length ({len(value)}) must be 1 or {n}; a numeric '
+            f'two-element sequence is treated as one limit pair and broadcast'
+        )
+
+    normalized = []
+    for i, item in enumerate(value):
+        if item is None and allow_none:
+            normalized.append(None)
+        elif _is_numeric_limit_pair(item):
+            normalized.append(tuple(item))
+        else:
+            raise ValueError(
+                f'{name}[{i}] must be a numeric (min, max) pair'
+                + (' or None' if allow_none else '')
+            )
+    return normalized
 
 
 def _to_n(value, n, name, *, allow_none=False):
@@ -122,7 +147,8 @@ def subplot(nh, nw,
     xlim, ylim : tuple | list of tuple | None
         Optional axis limits. Scalars/tuples are broadcast to all axes.
     grid : bool | list of bool
-        Grid visibility per axis. Scalars are broadcast to all axes.
+        Grid visibility per axis. Scalars are broadcast to all axes. Enabled
+        grid lines are drawn behind plotted data.
 
     Returns
     -------
@@ -243,11 +269,83 @@ def subplot(nh, nw,
             ax.set_xlim(xlim_list[idx])
         if ylim_list[idx] is not None:
             ax.set_ylim(ylim_list[idx])
+        ax.set_axisbelow(True)
         ax.grid(bool(grid_list[idx]))
 
     axes = np.asarray(axes_flat, dtype=object).reshape(nh, nw)
 
     return axes, fig, pos
+
+
+def subplots(
+    nrow,
+    ncol,
+    *,
+    fig_layout=None,
+    layout_kwargs=None,
+    **subplot_kwargs
+):
+    """
+    Create a standard plotops subplot figure in one setup call.
+
+    This is a convenience wrapper for the common custom-plotting setup:
+
+    1. call `layout(nrow, ncol, **layout_kwargs)` to compute reproducible
+       figure size, margins, and subplot spacing, unless `fig_layout` is
+       supplied directly
+    2. call `subplot(nrow, ncol, layout=fig_layout, **subplot_kwargs)` to
+       create the matplotlib figure and axes
+    3. return one dictionary containing the figure, axes, positions, and layout
+
+    The wrapper does not draw data and does not call `finish(...)`. Custom
+    plotting code should draw on `out["axes"]` and then call `finish(...)`
+    explicitly when the figure is ready.
+
+    Parameters
+    ----------
+    nrow, ncol : int
+        Number of subplot rows and columns.
+    fig_layout : dict, optional
+        Existing layout dictionary returned from `layout(...)`. If omitted,
+        this function computes one with `layout(nrow, ncol, **layout_kwargs)`.
+    layout_kwargs : dict, optional
+        Keyword arguments forwarded to `layout(...)` when `fig_layout` is not
+        supplied.
+    **subplot_kwargs
+        Keyword arguments forwarded to `subplot(...)`, such as `xlabel`,
+        `ylabel`, `xlog`, `ylog`, `xlim`, `ylim`, `grid`, `weight_h`,
+        `weight_w`, or `fig`.
+
+    Returns
+    -------
+    dict
+        Dictionary with:
+
+        - `"fig"`: matplotlib figure handle
+        - `"axes"`: 2D NumPy object array of axes, shape `(nrow, ncol)`
+        - `"pos"`: list of normalized axes positions
+        - `"layout"`: layout dictionary used to create the figure
+    """
+
+    if fig_layout is not None and layout_kwargs is not None:
+        raise ValueError('Provide either fig_layout or layout_kwargs, not both')
+
+    if fig_layout is None:
+        fig_layout = layout(nrow, ncol, **dict(layout_kwargs or {}))
+
+    axes, fig, pos = subplot(
+        nrow,
+        ncol,
+        layout=fig_layout,
+        **subplot_kwargs
+    )
+
+    return {
+        'fig': fig,
+        'axes': axes,
+        'pos': pos,
+        'layout': fig_layout,
+    }
 
 
 def finish(
@@ -323,9 +421,6 @@ def finish(
     active_axes = axes_flat[:n_active]
     inactive_axes = axes_flat[n_active:]
 
-    def _to_n(value, n, name):
-        return _to_n_with_limit_pair(value, n, name)
-
     def _set_visible_y_limits(ax, frac, ylog_axis=False):
         xlim_current = ax.get_xlim()
         xlo, xhi = sorted(xlim_current)
@@ -398,7 +493,10 @@ def finish(
         return order
 
     ylog_list = _to_n(ylog, n_active, 'ylog')
-    xlim_list = _to_n_with_limit_pair(xlim, n_active, 'xlim') if n_active > 0 else []
+    xlim_list = (
+        _to_n_with_limit_pair(xlim, n_active, 'xlim', allow_none=True)
+        if n_active > 0 else []
+    )
 
     if tight:
         for i, ax in enumerate(active_axes):
