@@ -300,7 +300,9 @@ def plotxy(
 
         xlog_fig = _to_n(xlog, n_signal, 'xlog')[i0:i1] + [False] * n_pad
         ylog_fig = _to_n(ylog, n_signal, 'ylog')[i0:i1] + [False] * n_pad
-        xlim_fig = _to_n(xlim, n_signal, 'xlim')[i0:i1] + [None] * n_pad
+        xlim_fig = figure._to_n_with_limit_pair(
+            xlim, n_signal, 'xlim', allow_none=True
+        )[i0:i1] + [None] * n_pad
         ylabel_fig = ylabel[i0:i1] + [None] * n_pad
 
         axes, fig, _ = figure.subplot(
