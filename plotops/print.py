@@ -160,18 +160,33 @@ def savefig(
         )
 
     # --- panel labels only for export ---
+    # Colorbars and similar auxiliary axes are present in fig.axes, but should
+    # not turn a single-panel figure into a multi-panel figure or receive a
+    # panel label themselves.
+    primary_axes = [
+        ax for ax in fig.axes
+        if ax.get_label() != '<colorbar>'
+        and not hasattr(ax, '_colorbar')
+    ]
     panel_artists = []
-    if panel_labels and len(fig.axes) > 1:
+    if panel_labels and len(primary_axes) > 1:
         if isinstance(panel_labels, bool):
-            labels = [_index_to_letters(i) + panel_suffix for i in range(len(fig.axes))]
+            labels = [
+                _index_to_letters(i) + panel_suffix
+                for i in range(len(primary_axes))
+            ]
         else:
             labels = list(panel_labels)
-            if len(labels) < len(fig.axes):
-                raise ValueError('panel_labels iterable must have at least one label per axis')
+            if len(labels) < len(primary_axes):
+                raise ValueError(
+                    'panel_labels iterable must have at least one label per '
+                    'primary axis'
+                )
 
-        for i, ax in enumerate(fig.axes):
+        for i, ax in enumerate(primary_axes):
             va = 'top' if panel_loc[1] < 0 else 'bottom'
-            t = ax.text(
+            text_method = ax.text2D if hasattr(ax, 'text2D') else ax.text
+            t = text_method(
                 panel_loc[0],
                 panel_loc[1],
                 labels[i],
@@ -199,7 +214,8 @@ def savefig(
         if first_out is None:
             first_out = out
 
-        print(f'saving {filename} to {print_folder} in {fmt}')
+        height_cm, width_cm = figsize
+        print(f'saving {filename} to {print_folder} in {height_cm:g} x {width_cm:g} cm {fmt}')
 
     # --- remove temporary panel labels so interactive view stays unchanged ---
     for artist in panel_artists:
