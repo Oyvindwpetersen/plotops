@@ -23,11 +23,13 @@ import plotops
 Preferred top-level functions:
 - `plotops.layout`
 - `plotops.subplot`
+- `plotops.subplots`
 - `plotops.finish`
 - `plotops.multiplot`
 - `plotops.plot_timefreq`
 - `plotops.plot3d`
 - `plotops.savefig`
+- `plotops.close`
 
 Avoid importing deep internals unless needed for a specific reason.
 
@@ -41,13 +43,15 @@ Avoid importing deep internals unless needed for a specific reason.
 
 2. Axes creation / plotting layer
    - `plotops.subplot(...)` creates axes using the layout
+   - `plotops.subplots(...)` combines `layout(...)` and `subplot(...)` for custom plotting setup
    - `plotops.finish(...)` applies standard post-plot finishing for custom subplot workflows
    - `plotops.multiplot(...)` creates standard row-wise multi-source plots directly
    - `plotops.plot_timefreq(...)` creates standard 2-column time/FFT plots
    - `plotops.plot3d(...)` flattens 3D matrix-style data into a subplot grid
 
 This means:
-- if the code needs custom plotting logic, use `layout()` + `subplot()` + `finish()`
+- for custom plotting, prefer `plotops.subplots(...)` + custom drawing + `plotops.finish(...)`
+- use the explicit `layout()` + `subplot()` form when the layout dictionary must be inspected, reused for export, or shared across figures
 - if the code matches the standard “same x-type data, several sources, one signal per subplot row” pattern, use `multiplot()`
 - if the code matches a standard time-domain plus FFT comparison pattern, prefer `plot_timefreq()`
 - if the input is matrix-style 3D data, prefer `plot3d()`
@@ -61,17 +65,19 @@ Use this when you want full control over what is drawn in each axis.
 ```python
 import plotops
 
-layout = plotops.layout(2, 1)
-axes, fig, _ = plotops.subplot(
+fig_out = plotops.subplots(
     2,
     1,
-    layout=layout,
+    layout_kwargs={"subsize": (3.0, 8.0)},
     xlabel="t [s]",
     ylabel=["Signal 1", "Signal 2"],
     ylog=False,
     xlog=False,
     grid=True,
 )
+
+fig = fig_out["fig"]
+axes = fig_out["axes"]
 
 axes[0, 0].plot(x, y1)
 axes[1, 0].plot(x, y2)
@@ -88,14 +94,23 @@ Use this pattern when:
 - you need annotations, mixed plot types, or special axis handling
 - you are building figures manually
 
-Pass shared axis settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, and `grid` directly into `plotops.subplot(...)` when available, instead of setting them afterwards axis by axis. Then call `plotops.finish(...)` after custom plotting to apply the standard post-plot behavior that `plotxy()` would otherwise handle automatically, such as axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive helpers.
+Pass shared axis settings such as `xlabel`, `ylabel`, `xlog`, `ylog`, `xlim`, `ylim`, and `grid` directly into `plotops.subplots(...)` when available, instead of setting them afterwards axis by axis. Then call `plotops.finish(...)` after custom plotting to apply the standard post-plot behavior that `plotxy()` would otherwise handle automatically, such as axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive helpers.
 
-For `plotops.subplot(...)`, treat `ylabel` as supporting exactly these shapes:
+`plotops.subplots(...)` accepts layout options inside its `layout_kwargs` dictionary. This differs from the high-level plotting functions, where `layout_kwargs` is the already computed dictionary returned by `plotops.layout(...)`.
+
+For `plotops.subplot(...)` and `plotops.subplots(...)`, treat `ylabel` as supporting exactly these shapes:
 - a single string for all axes
 - a list of length `nrow` for one y-label per row across all columns
 - a list of length `nrow * ncol` for one y-label per axis in row-major order
 
 Example: on a 2-row subplot grid, `ylabel=["MSD", ""]` labels the first row and leaves the second row unlabeled.
+
+For `xlim` and `ylim`:
+- `None` leaves limits automatic
+- one numeric `(min, max)` pair is broadcast to all axes
+- a sequence of pairs applies one pair per axis in row-major order
+
+For `grid`, pass one boolean for all axes or one boolean per axis. Enabled grid lines are drawn behind plotted data.
 
 ### Pattern B: standard multi-source line plots
 
@@ -166,9 +181,19 @@ fig_out = plotops.plot3d(
 
 ## Preferences
 
-### Prefer `layout()` before plotting
+### Choose the API by plot type
 
-Create layout explicitly when figure shape matters.
+| Plot type | Preferred API |
+|---|---|
+| Standard source comparison | `plotops.multiplot()` |
+| Time domain plus FFT | `plotops.plot_timefreq()` |
+| Matrix-style 3D input | `plotops.plot3d()` |
+| Custom artists or mixed plot types | `plotops.subplots()` + `plotops.finish()` |
+| Inspected, reused, or shared layout | `plotops.layout()` + `plotops.subplot()` + `plotops.finish()` |
+
+### Use explicit `layout()` when the layout object matters
+
+For custom plots, `plotops.subplots(...)` computes the layout automatically. Create it explicitly when the layout dictionary must be inspected, reused, shared, or passed to `plotops.savefig(...)`.
 
 ```python
 layout = plotops.layout(nrow, ncol)
@@ -177,6 +202,8 @@ layout = plotops.layout(nrow, ncol)
 Pass it forward as:
 - `layout=layout` to `plotops.subplot(...)`
 - `layout_kwargs=layout` to `plotops.multiplot(...)`, `plotops.plot_timefreq(...)`, or `plotops.plot3d(...)`
+
+Do not confuse that high-level use with `plotops.subplots(layout_kwargs={...})`, where the dictionary contains arguments that will be forwarded to `plotops.layout(...)`.
 
 This is preferred over relying on default spacing when writing project code that should stay visually consistent.
 
@@ -248,6 +275,16 @@ Where:
 
 Use this when you need direct access to axes handles.
 
+### `plotops.subplots(...)`
+
+Returns a `dict` containing:
+- `"fig"`: the matplotlib figure handle
+- `"axes"`: a 2D NumPy object array with shape `(nrow, ncol)`
+- `"pos"`: normalized axes positions
+- `"layout"`: the computed or supplied layout dictionary
+
+Use this as the default setup for custom plotting. Supply layout options with `layout_kwargs={...}`, or pass an existing layout dictionary with `fig_layout=layout`. Do not pass both.
+
 ### `plotops.finish(...)`
 
 Returns a `dict`.
@@ -258,7 +295,7 @@ Important keys:
 - `"active_axes"`: flattened list of active axes used for finishing
 - `"legend"`: the created figure-level legend artist, or `None`
 
-Use this after `plotops.subplot(...)` and custom plotting when you want standard finishing behavior without switching to `plotops.multiplot(...)`.
+Use this after `plotops.subplots(...)` or `plotops.subplot(...)` and custom plotting when you want standard finishing behavior without switching to `plotops.multiplot(...)`.
 
 ### `plotops.multiplot(...)`
 
@@ -309,6 +346,10 @@ Does not return a plot object to build on. Treat it as an export function with s
 - writes files to disk
 - may open the first saved file by default
 
+### `plotops.close(...)`
+
+Closes matplotlib figures. `plotops.close()` defaults to closing all open figures; pass a figure, figure number, or figure name to close a specific target.
+
 ## Data Shape Conventions
 
 ### For `multiplot()`
@@ -347,11 +388,13 @@ When creating or updating plotting code in this repository:
 2. Prefer `plotops.layout()` for reproducible figure dimensions.
 3. Prefer `plotops.multiplot()` for standard comparison plots.
 4. Prefer `plotops.plot_timefreq()` for standard time-and-FFT comparison plots.
-5. Use `plotops.subplot()` when custom axes-by-axes plotting is needed.
-6. After custom plotting with `plotops.subplot()`, prefer `plotops.finish()` for legend placement, axis tightening, hiding unused axes, and interactive helpers.
-7. Use `plotops.savefig()` for final exported figures.
-8. Keep labels, units, and legend names explicit.
-9. Preserve returned handles (`fig`, `axes`, `fig_out`) when later code may need editing, annotations, or saving.
+5. Prefer `plotops.subplots()` when custom axes-by-axes plotting is needed.
+6. Use explicit `plotops.layout()` + `plotops.subplot()` when the layout must be inspected, reused for export, or shared across figures.
+7. After custom plotting, use `plotops.finish()` for legend placement, axis tightening, hiding unused axes, and interactive helpers.
+8. Use `plotops.savefig()` for final exported figures.
+9. Use `plotops.close()` when a workflow should explicitly release figures.
+10. Keep labels, units, and legend names explicit.
+11. Preserve returned handles (`fig`, `axes`, `fig_out`) when later code may need editing, annotations, or saving.
 
 ## When Not to Use `plotops`
 
@@ -393,17 +436,19 @@ If the plot needs custom drawing, use:
 ```python
 import plotops
 
-layout = plotops.layout(nrow, ncol)
-axes, fig, _ = plotops.subplot(
+fig_out = plotops.subplots(
     nrow,
     ncol,
-    layout=layout,
+    layout_kwargs=layout_options,
     xlabel=xlabel,
     ylabel=ylabel,
     xlog=xlog,
     ylog=ylog,
     grid=grid,
 )
+
+fig = fig_out["fig"]
+axes = fig_out["axes"]
 
 # custom plotting on `axes`
 
