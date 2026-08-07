@@ -10,6 +10,18 @@ import os
 from numbers import Real
 
 
+def close(target="all"):
+    """Close Matplotlib figures.
+
+    Parameters
+    ----------
+    target : ``"all"``, int, str, or matplotlib.figure.Figure, optional
+        Figure target accepted by :func:`matplotlib.pyplot.close`. The default
+        closes all open figures.
+    """
+    plt.close(target)
+
+
 def _is_numeric_limit_pair(value):
     if isinstance(value, (str, bytes)) or value is None:
         return False
