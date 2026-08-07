@@ -32,10 +32,12 @@ Layout and figure control:
 
 - `layout()` computes figure size and normalized layout parameters
 - `subplot()` creates tightly controlled subplot grids as a 2D axes array and can apply labels, log scaling, limits, and grids; `ylabel` may be a single string, one label per row, or one label per axis in row-major order
+- `subplots()` combines `layout()` and `subplot()` in one setup call and returns the figure, axes, positions, and layout
 - `finish()` applies standard post-plot finishing for custom subplot workflows
 - `axistight()` applies MATLAB-style axis padding
 - `size()` resizes and repositions the figure window
 - `tile()` tiles all open figures on screen
+- `close()` closes all open figures by default, or a specific matplotlib figure target when supplied
 - `log_toggle()` toggles linear and log scale interactively
 - `enable_popout()` pops the active axes into a new figure
 
@@ -91,17 +93,20 @@ plotops.print.savefig(
 
 ## Manual Plotting
 
-For cases where you want the layout helper but will add lines or scatter plots manually:
+For custom plots with manually added lines, scatter plots, annotations, or mixed artist types, prefer `plotops.subplots()` followed by `plotops.finish()`:
 
 ```python
-layout = plotops.layout(2, 1)
-axes, fig, _ = plotops.subplot(
+fig_out = plotops.subplots(
     2, 1,
-    layout=layout,
+    layout_kwargs={"subsize": (3.0, 8.0)},
     xlabel="t [s]",
     ylabel=["Signal 1", "Signal 2"],
     ylog=False,
+    grid=True,
 )
+
+fig = fig_out["fig"]
+axes = fig_out["axes"]
 
 axes[0, 0].plot(x, y1)
 axes[1, 0].scatter(x, y2)
@@ -115,13 +120,53 @@ plotops.finish(
 
 `plotops.finish()` is the recommended way to give custom subplot-based figures the same kind of post-plot behavior that high-level helpers already provide automatically, including axis tightening, figure-level legend placement, hiding unused padded axes, cursor hookup, and interactive figure helpers.
 
-For `plotops.subplot(...)`, `ylabel` supports three explicit forms:
+Use the explicit `layout()` + `subplot()` form when the layout dictionary must be inspected, reused for export, or shared across figures:
+
+```python
+layout = plotops.layout(2, 1)
+axes, fig, _ = plotops.subplot(2, 1, layout=layout)
+```
+
+The name `layout_kwargs` has two related uses in the API:
+
+- `plotops.subplots(layout_kwargs={...})` expects arguments that are forwarded to `plotops.layout()`, such as `{"subsize": (3.0, 8.0)}`.
+- `plotops.multiplot(..., layout_kwargs=layout)` and the other high-level plotting functions expect the already computed dictionary returned by `plotops.layout()`.
+
+For `plotops.subplot(...)` and `plotops.subplots(...)`, `ylabel` supports three explicit forms:
 
 - a single string to apply to every axis
 - a list of length `nrow` to apply one y-label per subplot row across all columns
 - a list of length `nrow * ncol` to apply one y-label per axis in row-major order
 
 For example, `ylabel=["MSD", ""]` on a `2 x 1` or `2 x 2` subplot grid labels the first row as `MSD` and leaves the second row unlabeled.
+
+For `xlim` and `ylim`, pass `None` for automatic limits, one numeric `(min, max)` pair to broadcast it to every axis, or one pair per axis in row-major order. For `grid`, pass one boolean for all axes or one boolean per axis; enabled grid lines are drawn behind the plotted data.
+
+`plotops.subplots()` returns a dictionary with `"fig"`, `"axes"`, `"pos"`, and `"layout"`. You may provide a previously computed layout with `fig_layout=layout`; do not provide both `fig_layout` and `layout_kwargs`.
+
+## Choosing A Plotting API
+
+| Plot type | Preferred API |
+|---|---|
+| Standard source comparison | `plotops.multiplot()` |
+| Time domain plus FFT | `plotops.plot_timefreq()` |
+| Matrix-style 3D input | `plotops.plot3d()` |
+| Custom artists or mixed plot types | `plotops.subplots()` + `plotops.finish()` |
+| Inspected, reused, or shared layout | `plotops.layout()` + `plotops.subplot()` + `plotops.finish()` |
+
+## Closing Figures
+
+`plotops.close()` closes all open matplotlib figures by default:
+
+```python
+plotops.close()
+```
+
+Pass a figure handle, number, or name to close only that target:
+
+```python
+plotops.close(fig_out["fig"])
+```
 
 ## Time And Frequency
 
