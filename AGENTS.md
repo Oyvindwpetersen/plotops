@@ -20,6 +20,8 @@ Use:
 import plotops
 ```
 
+Keep the package name as `plotops` in code. Do not introduce aliases such as `po`, `pops`, or another shortened name. This keeps examples, scripts, and generated code consistent and makes the source of plotting helpers immediately clear.
+
 Preferred top-level functions:
 - `plotops.layout`
 - `plotops.subplot`

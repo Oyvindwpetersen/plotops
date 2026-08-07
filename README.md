@@ -11,6 +11,14 @@ Structured plotting utilities built on top of matplotlib.
 
 Designed for engineering and scientific workflows where layout consistency matters.
 
+Use the package name directly in code:
+
+```python
+import plotops
+```
+
+Prefer `plotops` over shortened aliases such as `po` or `pops` so examples and project code use one consistent namespace.
+
 ## Install
 
 ```bash
